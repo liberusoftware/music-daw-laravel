@@ -12,10 +12,12 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Liberu\Foundation\Files\Contracts\MediaAccess;
+use Liberu\Music\Projects\Commands\BackfillSessionRetention;
 use Liberu\Music\Projects\Commands\SaveSession;
 use Liberu\Music\Projects\Contracts\ProjectAccess;
 use Liberu\Music\Projects\Contracts\SessionMediaRetention;
 use Liberu\Music\Projects\Contracts\VerifiedMedia;
+use Liberu\Music\Projects\Data\RetentionBackfillStatus;
 use Liberu\Music\Projects\Data\SessionDocument;
 use Liberu\Music\Projects\Data\SessionPage;
 use Liberu\Music\Projects\Data\SessionRevision;
@@ -164,6 +166,46 @@ final readonly class ProjectSessions
         $source = $this->get($actor, $workspaceId, $projectId, $sourceVersion);
 
         return $this->save($actor, new SaveSession($workspaceId, $projectId, $source->title, $source->document, $expectedVersion, $idempotencyKey, template: $source->template));
+    }
+
+    public function retentionStatus(Authenticatable $actor, string $workspaceId): RetentionBackfillStatus
+    {
+        $this->access->authorize($actor, $workspaceId, '*', 'retain');
+        $row = $this->database->table('music_project_retention_backfills')->where('workspace_id', $workspaceId)->first();
+
+        return new RetentionBackfillStatus($workspaceId, $row === null ? null : (int) $row->through_revision_id, (int) ($row->last_revision_id ?? 0), (int) ($row->processed_revisions ?? 0));
+    }
+
+    public function retainHistory(Authenticatable $actor, BackfillSessionRetention $command): RetentionBackfillStatus
+    {
+        $this->access->authorize($actor, $command->workspaceId, '*', 'retain');
+
+        return $this->database->transaction(function () use ($actor, $command): RetentionBackfillStatus {
+            $target = (int) $this->database->table('music_project_revisions')->where('workspace_id', $command->workspaceId)->max('id');
+            $this->database->table('music_project_retention_backfills')->insertOrIgnore([
+                'workspace_id' => $command->workspaceId, 'through_revision_id' => $target,
+                'last_revision_id' => 0, 'processed_revisions' => 0, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $progress = $this->database->table('music_project_retention_backfills')->where('workspace_id', $command->workspaceId);
+            $current = $progress->lockForUpdate()->firstOrFail();
+            $through = $command->restart ? $target : (int) $current->through_revision_id;
+            $last = $command->restart ? 0 : (int) $current->last_revision_id;
+            $processed = $command->restart ? 0 : (int) $current->processed_revisions;
+            $ids = $this->database->table('music_project_revisions')->where('workspace_id', $command->workspaceId)
+                ->where('id', '>', $last)->where('id', '<=', $through)->orderBy('id')->limit($command->limit)->get(['id', 'project_id']);
+            foreach ($ids as $identity) {
+                $this->access->authorize($actor, $command->workspaceId, $identity->project_id, 'read');
+                // Fetch one bounded manifest at a time. A PDO buffered cursor over
+                // the whole page could otherwise retain 25 manifests of 16 MiB.
+                $row = $this->revisions($command->workspaceId, $identity->project_id)->where('id', $identity->id)->firstOrFail();
+                $this->retainMedia($actor, $this->revision($row));
+                $last = (int) $identity->id;
+                $processed++;
+            }
+            $progress->update(['through_revision_id' => $through, 'last_revision_id' => $last, 'processed_revisions' => $processed, 'updated_at' => now()]);
+
+            return new RetentionBackfillStatus($command->workspaceId, $through, $last, $processed);
+        }, 3);
     }
 
     public function export(Authenticatable $actor, string $workspaceId, string $projectId, ?int $version = null): string
