@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add durable owned queued trash recovery with live worker policies, safe failure/retry outcomes and serialized cancellation/publication.
+
 - Add a typed offline pin version conflict while preserving UploadConflict parent compatibility.
 
 - Distinguish conflicting pack idempotency keys from stale revisions through the existing typed metadata command conflict.

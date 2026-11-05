@@ -23,6 +23,7 @@ use Liberu\Music\MediaLibrary\Services\MediaSearchAdapter;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
 use Liberu\Music\MediaLibrary\Services\PackArchives;
 use Liberu\Music\MediaLibrary\Services\QuarantineCleanup;
+use Liberu\Music\MediaLibrary\Services\TrashRecovery;
 use Liberu\Music\MediaLibrary\Services\WaveformProcessing;
 use Liberu\Music\MediaLibrary\Support\ConfiguredUploadBudget;
 use Liberu\Music\MediaLibrary\Support\GateMediaAuthorizer;
@@ -41,7 +42,7 @@ final class MusicMediaLibraryServiceProvider extends ServiceProvider
         $this->app->bindIf(UploadBudgetPolicy::class, ConfiguredUploadBudget::class);
         $provider = config('music-media.user_provider') ?? config('auth.guards.'.config('auth.defaults.guard').'.provider')
             ?? config('auth.passwords.'.config('auth.defaults.passwords').'.provider');
-        $this->app->when([ScopedMediaAccess::class, WaveformProcessing::class, AssetProcessing::class])->needs(UserProvider::class)->give(fn () => $this->app->make('auth')->createUserProvider($provider));
+        $this->app->when([ScopedMediaAccess::class, WaveformProcessing::class, AssetProcessing::class, TrashRecovery::class])->needs(UserProvider::class)->give(fn () => $this->app->make('auth')->createUserProvider($provider));
         $this->app->when([AssetLifecycle::class, AssetGarbageCollection::class, MediaDownloads::class, MediaUploads::class, AssetWaveforms::class, MediaCatalog::class, QuarantineCleanup::class, MediaPacks::class, PackArchives::class])->needs(Filesystem::class)->give(fn () => $this->app->make('filesystem')->disk(config('music-media.disk')));
         $this->app->when(PackArchives::class)->needs('$maxAudioBytes')->give(fn () => config('music-media.archive_max_audio_bytes'));
     }
