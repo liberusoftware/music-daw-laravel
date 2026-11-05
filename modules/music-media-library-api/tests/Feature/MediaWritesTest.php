@@ -4,12 +4,15 @@ use Illuminate\Contracts\Auth\Access\Gate;
 use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
+use Liberu\Foundation\ImportExport\Contracts\TransferAuthorizer;
 use Liberu\Music\MediaLibrary\Commands\RetainAssets;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
@@ -234,4 +237,73 @@ it('rejects an oversized declared body before reading its input stream', functio
     } catch (HttpExceptionInterface $exception) {
         expect($exception->getStatusCode())->toBe(413);
     }
+});
+
+it('issues short-lived actor-scoped download URLs and streams verified private WAVE bytes', function () {
+    $id = ($this->publish)();
+    $endpoint = $this->base.'/assets/'.$id.'/download-url';
+    $this->getJson($endpoint)->assertForbidden();
+    Sanctum::actingAs($this->actor, ['music.media.read', 'music.media.download']);
+    app(Gate::class)->define('music.media.download', fn () => true);
+    $this->getJson($endpoint)->assertForbidden();
+    $allowed = true;
+    $policy = Mockery::mock(TransferAuthorizer::class);
+    $policy->shouldReceive('allowed')->with('7', 'music-media-asset', 'export')->andReturnUsing(function () use (&$allowed) {
+        return $allowed;
+    });
+    app()->instance(TransferAuthorizer::class, $policy);
+    $grant = $this->getJson($endpoint)->assertSuccessful()->assertHeader('Cache-Control', 'no-store, private')
+        ->assertJsonPath('data.sha256', hash('sha256', $this->bytes))->assertJsonPath('data.bytes', strlen($this->bytes));
+    $url = $grant->json('data.url');
+    expect(Carbon::parse($grant->json('data.expires_at'))->timestamp - now()->timestamp)->toBe(60);
+    expect($url)->not->toContain('music/assets', 'quarantine');
+    $response = $this->get($url)->assertSuccessful()->assertHeader('Content-Type', 'audio/wav')
+        ->assertHeader('ETag', '"'.hash('sha256', $this->bytes).'"')->assertHeader('Content-Length', (string) strlen($this->bytes))
+        ->assertHeader('Accept-Ranges', 'none')->assertHeader('X-Content-Type-Options', 'nosniff');
+    expect($response->streamedContent())->toBe($this->bytes);
+    $allowed = false;
+    $this->get($url)->assertForbidden();
+    $allowed = true;
+    $this->denied = 'read';
+    $this->get($url)->assertForbidden();
+    $this->denied = null;
+    app(Gate::class)->define('music.media.download', fn () => false);
+    $this->get($url)->assertForbidden();
+});
+
+it('rejects expired tampered actor-mismatched and stale-checksum download links', function () {
+    $id = ($this->publish)();
+    Sanctum::actingAs($this->actor, ['music.media.read', 'music.media.download']);
+    app(Gate::class)->define('music.media.download', fn () => true);
+    app()->instance(TransferAuthorizer::class,
+        Mockery::mock(TransferAuthorizer::class)->shouldReceive('allowed')->andReturn(true)->getMock());
+    $url = $this->getJson($this->base.'/assets/'.$id.'/download-url')->assertSuccessful()->json('data.url');
+    $this->get($url.'&extra=value')->assertForbidden();
+    $this->get($url, ['Range' => 'bytes=0-10'])->assertStatus(416)->assertHeader('Accept-Ranges', 'none');
+    $this->get(URL::temporarySignedRoute('music.media.api.download', now()->addMinute(),
+        ['workspace' => 'studio', 'asset' => $id, 'actor' => '8', 'sha256' => hash('sha256', $this->bytes)]))->assertForbidden();
+    $this->get(URL::temporarySignedRoute('music.media.api.download', now()->addMinute(),
+        ['workspace' => 'studio', 'asset' => $id, 'actor' => '7', 'sha256' => str_repeat('a', 64)]))->assertForbidden();
+    $this->travel(61)->seconds();
+    $this->get($url)->assertForbidden();
+    $this->travelBack();
+});
+
+it('fails closed for changed missing unverified and cross-workspace downloadable media', function () {
+    $id = ($this->publish)();
+    Sanctum::actingAs($this->actor, ['music.media.read', 'music.media.download']);
+    app(Gate::class)->define('music.media.download', fn () => true);
+    app()->instance(TransferAuthorizer::class,
+        Mockery::mock(TransferAuthorizer::class)->shouldReceive('allowed')->andReturn(true)->getMock());
+    $endpoint = $this->base.'/assets/'.$id.'/download-url';
+    $url = $this->getJson($endpoint)->assertSuccessful()->json('data.url');
+    $key = DB::table('music_media_uploads')->where('id', $id)->value('blob_key');
+    $this->disk->put($key, str_repeat('x', strlen($this->bytes)));
+    $this->get($url)->assertUnprocessable()->assertJsonPath('status', 422);
+    $this->disk->delete($key);
+    $this->get($url)->assertUnprocessable();
+    $this->getJson($endpoint)->assertUnprocessable();
+    $this->getJson(str_replace('/studio/', '/other/', $endpoint))->assertNotFound();
+    DB::table('music_media_uploads')->where('id', $id)->update(['status' => 'uploading']);
+    $this->getJson($endpoint)->assertNotFound();
 });

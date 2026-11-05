@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\AssetTasksController;
+use Liberu\Music\MediaLibraryApi\Http\Controllers\DownloadsController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\MediaController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\MetadataController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\UploadsController;
@@ -12,6 +13,8 @@ use Liberu\Music\MediaLibraryApi\Http\Middleware\RequireMedia;
 Route::prefix('api/v1/music-media/workspaces/{workspace}')->where(['workspace' => '[A-Za-z0-9_-]{1,128}'])
     ->name('music.media.api.')->middleware([ApiBoundary::class, 'auth:sanctum', RequireMedia::class, 'throttle:60,1'])->group(function () {
         Route::middleware(CheckAbilities::class.':music.media.read')->group(function () {
+            Route::get('/assets/{asset}/download-url', [DownloadsController::class, 'issue'])->whereUuid('asset')->middleware(CheckAbilities::class.':music.media.download')->name('download-url');
+            Route::get('/assets/{asset}/download', [DownloadsController::class, 'download'])->whereUuid('asset')->middleware(CheckAbilities::class.':music.media.download')->name('download');
             Route::put('/assets/{asset}/metadata', [MetadataController::class, 'update'])->whereUuid('asset')->middleware(CheckAbilities::class.':music.media.edit')->name('update');
             Route::put('/verification-tasks/{task}', [AssetTasksController::class, 'request'])->whereUuid('task')->middleware(CheckAbilities::class.':music.media.upload')->name('verify');
             Route::put('/assets/{asset}/restoration-tasks/{task}', [AssetTasksController::class, 'restore'])->whereUuid('asset')->whereUuid('task')->middleware(CheckAbilities::class.':music.media.restore')->name('restore');

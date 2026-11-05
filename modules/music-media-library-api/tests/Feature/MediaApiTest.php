@@ -63,7 +63,7 @@ beforeEach(function () {
 
 it('discovers explicit capabilities and serves verified metadata and authorized budgets', function () {
     $cap = $this->getJson($this->base.'/capabilities')->assertSuccessful()->assertJsonPath('data.schema_version', 1);
-    expect($cap->json('data.operations'))->toContain('waveform_cancel')->and($cap->json('data.unsupported'))->toContain('scoped_download_urls');
+    expect($cap->json('data.operations'))->toContain('waveform_cancel')->and($cap->json('data.unsupported'))->toContain('packs');
     expect($cap->headers->get('X-Request-ID'))->toBe($cap->json('meta.request_id'));
     expect($cap->headers->get('Cache-Control'))->toContain('no-store');
     $this->getJson($this->base.'/assets/'.$this->ids[0])->assertSuccessful()->assertJsonPath('data.audio.frames', 2)->assertJsonMissingPath('data.blob_key');
