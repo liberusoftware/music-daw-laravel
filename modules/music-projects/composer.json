@@ -1,0 +1,46 @@
+{
+  "name": "liberusoftware/music-projects",
+  "description": "Versioned Music session documents, revisions and autosave recovery.",
+  "type": "liberu-module",
+  "license": "MIT",
+  "version": "0.1.0",
+  "require": {
+    "php": "^8.5",
+    "illuminate/auth": "^13.38",
+    "illuminate/database": "^13.38",
+    "illuminate/events": "^13.38",
+    "illuminate/support": "^13.38",
+    "illuminate/validation": "^13.38",
+    "liberusoftware/files-media": "^1.4",
+    "liberusoftware/identity-core": "^1.4",
+    "liberusoftware/settings": "^1.4"
+  },
+  "autoload": {
+    "psr-4": {
+      "Liberu\\Music\\Projects\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Liberu\\Music\\Projects\\Tests\\": "tests/"
+    }
+  },
+  "require-dev": {
+    "liberusoftware/package-testbench": "^1.8",
+    "pestphp/pest": "^5.3"
+  },
+  "extra": {
+    "liberu": {
+      "name": "music-projects"
+    }
+  },
+  "scripts": {
+    "test": "pest",
+    "test:coverage": "pest --coverage --min=100"
+  },
+  "config": {
+    "allow-plugins": {
+      "pestphp/pest-plugin": true
+    }
+  }
+}

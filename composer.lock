@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ea2b25bdb23733465ac7a44fed3217e3",
+    "content-hash": "1a3ac4eac878bfe526b436c1730bb4d7",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -6757,6 +6757,62 @@
                 "MIT"
             ],
             "description": "Filament operations presentation adapter for the Liberu Module Manager.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "liberusoftware/music-projects",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "modules/music-projects",
+                "reference": "42aa7830aa49479e9027ad5b10969bd0adaedef3"
+            },
+            "require": {
+                "illuminate/auth": "^13.38",
+                "illuminate/database": "^13.38",
+                "illuminate/events": "^13.38",
+                "illuminate/support": "^13.38",
+                "illuminate/validation": "^13.38",
+                "liberusoftware/files-media": "^1.4",
+                "liberusoftware/identity-core": "^1.4",
+                "liberusoftware/settings": "^1.4",
+                "php": "^8.5"
+            },
+            "require-dev": {
+                "liberusoftware/package-testbench": "^1.8",
+                "pestphp/pest": "^5.3"
+            },
+            "type": "liberu-module",
+            "extra": {
+                "liberu": {
+                    "name": "music-projects"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Liberu\\Music\\Projects\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Liberu\\Music\\Projects\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ],
+                "test:coverage": [
+                    "pest --coverage --min=100"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Versioned Music session documents, revisions and autosave recovery.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

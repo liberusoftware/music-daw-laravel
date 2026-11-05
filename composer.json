@@ -13,6 +13,13 @@
     "repositories": [
         {
             "type": "path",
+            "url": "modules/music-projects",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
             "url": "modules/activity-comments",
             "options": {
                 "symlink": true
@@ -419,6 +426,7 @@
         "liberusoftware/localization-mymemory": "^1.0",
         "liberusoftware/module-manager": "^1.0",
         "liberusoftware/module-manager-filament": "^1.1",
+        "liberusoftware/music-projects": "^0.1",
         "liberusoftware/notifications": "^1.0",
         "liberusoftware/observability": "^1.0",
         "liberusoftware/organizations-teams": "^1.0",
@@ -497,7 +505,8 @@
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi"
         ],
-        "test": "vendor/bin/pest"
+        "test": "vendor/bin/pest",
+        "test:coverage": "vendor/bin/pest --coverage --min=100"
     },
     "extra": {
         "laravel": {

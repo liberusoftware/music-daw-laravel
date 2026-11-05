@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schemas.liberu.dev/module/v1.json",
+  "name": "music-projects",
+  "display_name": "Music Projects",
+  "description": "Versioned Music session documents, revisions and autosave recovery.",
+  "version": "0.1.0",
+  "category": "product",
+  "provider": "Liberu\\Music\\Projects\\MusicProjectsServiceProvider",
+  "requires": {
+    "php": "^8.5",
+    "laravel": "^13.0",
+    "packages": {
+      "liberusoftware/files-media": "^1.4",
+      "liberusoftware/identity-core": "^1.4",
+      "liberusoftware/settings": "^1.4"
+    }
+  },
+  "capabilities": [
+    "music.projects"
+  ],
+  "default_enabled": true,
+  "features": [
+    "Versioned session documents",
+    "Revision checkpoints",
+    "Autosave recovery",
+    "Portable session manifests"
+  ]
+}
