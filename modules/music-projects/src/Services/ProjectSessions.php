@@ -93,7 +93,7 @@ final readonly class ProjectSessions
                 'checksum' => $command->document->checksum(), 'autosave' => $command->autosave,
                 'template' => $command->template, 'actor_id' => (string) $actor->getAuthIdentifier(),
                 'idempotency_key' => $command->idempotencyKey, 'fingerprint' => $fingerprint,
-                'created_at' => now(),
+                'created_at' => now('UTC'),
             ]);
             $revision = new SessionRevision($command->workspaceId, $command->projectId, $command->title, $version, $command->document, $command->autosave, $command->template);
             $this->events->dispatch(new SessionSaved($revision, (string) $actor->getAuthIdentifier()));
@@ -190,7 +190,7 @@ final readonly class ProjectSessions
             $target = (int) $this->database->table('music_project_revisions')->where('workspace_id', $command->workspaceId)->max('id');
             $this->database->table('music_project_retention_backfills')->insertOrIgnore([
                 'workspace_id' => $command->workspaceId, 'through_revision_id' => $target,
-                'last_revision_id' => 0, 'processed_revisions' => 0, 'created_at' => now(), 'updated_at' => now(),
+                'last_revision_id' => 0, 'processed_revisions' => 0, 'created_at' => now('UTC'), 'updated_at' => now('UTC'),
             ]);
             $progress = $this->database->table('music_project_retention_backfills')->where('workspace_id', $command->workspaceId);
             $current = $progress->lockForUpdate()->firstOrFail();
@@ -208,7 +208,7 @@ final readonly class ProjectSessions
                 $last = (int) $identity->id;
                 $processed++;
             }
-            $progress->update(['through_revision_id' => $through, 'last_revision_id' => $last, 'processed_revisions' => $processed, 'updated_at' => now()]);
+            $progress->update(['through_revision_id' => $through, 'last_revision_id' => $last, 'processed_revisions' => $processed, 'updated_at' => now('UTC')]);
 
             return new RetentionBackfillStatus($command->workspaceId, $through, $last, $processed);
         }, 3);

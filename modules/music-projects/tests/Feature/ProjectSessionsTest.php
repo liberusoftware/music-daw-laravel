@@ -1,5 +1,6 @@
 <?php
 
+use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Contracts\Auth\Access\Gate;
@@ -23,6 +24,7 @@ use Liberu\Music\Projects\Exceptions\ProjectTypeConflict;
 use Liberu\Music\Projects\Exceptions\RevisionConflict;
 use Liberu\Music\Projects\MusicProjectsServiceProvider;
 use Liberu\Music\Projects\Services\ProjectSessions;
+use Liberu\Music\Projects\Services\SessionChanges;
 use Liberu\Music\Projects\Services\SessionMetadata;
 use Liberu\Music\Projects\Support\GateProjectAccess;
 use Liberu\Music\Projects\Support\UnavailableMedia;
@@ -402,4 +404,17 @@ it('reports a typed immutable template conflict when the expected revision is cu
     expect(fn () => $this->sessions->save($this->actor, ($this->command)(1, 'change-type')))
         ->toThrow(ProjectTypeConflict::class);
     expect(DB::table('music_projects')->value('version'))->toBe(1);
+});
+
+it('records revision notification times in UTC independently of the host display timezone', function () {
+    $originalTimezone = date_default_timezone_get();
+    $this->travelTo(CarbonImmutable::parse('2026-11-05T15:00:00Z'));
+    date_default_timezone_set('America/New_York');
+    try {
+        $this->sessions->save($this->actor, ($this->command)());
+        expect(DB::table('music_project_revisions')->value('created_at'))->toBe('2026-11-05 15:00:00')
+            ->and(app(SessionChanges::class)->since($this->actor, 'studio', $this->projectId)->changes[0]['created_at'])->toBe('2026-11-05 15:00:00');
+    } finally {
+        date_default_timezone_set($originalTimezone);
+    }
 });
