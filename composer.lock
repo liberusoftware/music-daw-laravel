@@ -6768,7 +6768,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library",
-                "reference": "b378d7433f0fb37d21cdb26e85a32d8c671c0838"
+                "reference": "a2914c21e3e7c7ac8b97dbe06eefb8750b672233"
             },
             "require": {
                 "ext-zip": "*",
@@ -6819,7 +6819,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Verified Music audio, queued publication and trash recovery, rights packs and reference-safe cleanup.",
+            "description": "Verified Music audio, durable private archive exports, queued recovery, rights packs and safe cleanup.",
             "transport-options": {
                 "symlink": true,
                 "relative": true
