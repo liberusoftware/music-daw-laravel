@@ -2,12 +2,14 @@
 
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\RecordNotFoundException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Foundation\ImportExport\Contracts\TransferAuthorizer;
 use Liberu\Foundation\Search\Services\SearchService;
+use Liberu\Music\MediaLibrary\Commands\RequestWaveform;
 use Liberu\Music\MediaLibrary\Commands\SaveMediaPack;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Commands\UpdateAssetMetadata;
@@ -19,6 +21,7 @@ use Liberu\Music\MediaLibrary\Services\MediaRetention;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
 use Liberu\Music\MediaLibrary\Services\PackArchives;
 use Liberu\Music\MediaLibrary\Services\UploadBudgets;
+use Liberu\Music\MediaLibrary\Services\WaveformProcessing;
 
 it('finds tagged verified audio through the host foundation registry without widening workspace access', function () {
     $this->app->register(MusicMediaLibraryServiceProvider::class);
@@ -43,6 +46,13 @@ it('finds tagged verified audio through the host foundation registry without wid
     $uploads->start($actor, new StartUpload('studio', $id, 'Original', strlen($bytes), hash('sha256', $bytes), $rights));
     $uploads->append($actor, 'studio', $id, 0, $bytes);
     $uploads->complete($actor, 'studio', $id);
+    $waveforms = app(WaveformProcessing::class);
+    $taskId = (string) Str::uuid();
+    $waveforms->request($actor, new RequestWaveform('studio', $taskId, $id, 1));
+    $waveforms->process($taskId);
+    expect($waveforms->result($actor, 'studio', $taskId)->peaks)->toHaveCount(2);
+    expect(fn () => $waveforms->get(User::factory()->create(), 'studio', $taskId))->toThrow(RecordNotFoundException::class);
+
     app(MediaCatalog::class)->update($actor, new UpdateAssetMetadata('studio', $id, 'Kick one', ['DRUMS'], 0, 'tag'));
     $this->actingAs($actor);
     $search = app(SearchService::class);

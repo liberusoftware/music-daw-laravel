@@ -6768,15 +6768,18 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library",
-                "reference": "e9134fc790c7ecdfc5ac16697dd1a05112a16bce"
+                "reference": "eb2cae3cd8b6536d072a06a1d21dbbaf96e47db2"
             },
             "require": {
                 "ext-zip": "*",
                 "illuminate/auth": "^13.38",
+                "illuminate/bus": "^13.38",
+                "illuminate/cache": "^13.38",
                 "illuminate/database": "^13.38",
                 "illuminate/events": "^13.38",
                 "illuminate/filesystem": "^13.38",
                 "illuminate/pagination": "^13.38",
+                "illuminate/queue": "^13.38",
                 "illuminate/support": "^13.38",
                 "illuminate/validation": "^13.38",
                 "liberusoftware/files-media": "^1.4",
@@ -6816,7 +6819,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Private verified Music audio, reviewed ZIP packs, workspace upload budgets, retention and resumable cleanup.",
+            "description": "Private verified Music audio, reviewed packs, upload budgets, queued cached waveforms and retention.",
             "transport-options": {
                 "symlink": true,
                 "relative": true
