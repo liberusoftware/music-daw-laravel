@@ -1,0 +1,66 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: bcmath, gd, intl, mbstring, pdo_sqlite, zip
+          coverage: pcov
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: composer test:coverage -- --coverage-clover=coverage/host.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: host-coverage
+          path: coverage/host.xml
+  music-projects:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/music-projects
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: intl, mbstring, pdo_sqlite
+          coverage: pcov
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: composer test:coverage -- --coverage-clover=coverage/projects.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: projects-coverage
+          path: modules/music-projects/coverage/projects.xml
+  music-media-library:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/music-media-library
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: intl, mbstring, pdo_sqlite
+          coverage: pcov
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: composer test:coverage -- --coverage-clover=coverage/media.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: media-coverage
+          path: modules/music-media-library/coverage/media.xml
