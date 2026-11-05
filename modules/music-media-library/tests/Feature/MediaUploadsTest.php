@@ -18,7 +18,9 @@ use Liberu\Music\MediaLibrary\Events\AssetReady;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
 use Liberu\Music\MediaLibrary\Exceptions\UploadConflict;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
+use Liberu\Music\MediaLibrary\Services\AssetWaveforms;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
+use Liberu\Music\MediaLibrary\Services\WaveformIndexer;
 use Liberu\Music\MediaLibrary\Services\WaveInspector;
 use Liberu\Music\MediaLibrary\Support\GateMediaAuthorizer;
 
@@ -299,4 +301,43 @@ it('reads durable upload progress in one indexed database query', function () {
     $queries = DB::getQueryLog();
     DB::disableQueryLog();
     expect($progress->receivedBytes)->toBe(strlen($this->bytes))->and($queries)->toHaveCount(1);
+});
+
+it('indexes only authorized ready assets and retains explicit channel and frame positions', function () {
+    ($this->receive)();
+    $waveforms = app(AssetWaveforms::class);
+    expect(fn () => $waveforms->build($this->actor, 'studio', $this->id))->toThrow(RecordNotFoundException::class);
+    $this->uploads->complete($this->actor, 'studio', $this->id);
+    $waveform = $waveforms->build($this->actor, 'studio', $this->id, 1);
+    expect($waveform->audio->sha256)->toBe(hash('sha256', $this->bytes))->and($waveform->peaks)->toHaveCount(2)
+        ->and($waveform->peaks[0]['start_sample_frame'])->toBe(0)->and($waveform->peaks[1]['end_sample_frame'])->toBe(2)
+        ->and($waveform->peaks[0]['channels'][0])->toBe(['minimum' => 0.0, 'maximum' => 0.0])
+        ->and($waveform->peaks[1]['channels'][1])->toBe(['minimum' => 0.5, 'maximum' => 0.5]);
+    expect(fn () => $waveforms->build($this->actor, 'other', $this->id))->toThrow(RecordNotFoundException::class);
+    app(Gate::class)->define('music.media.read', fn () => false);
+    expect(fn () => $waveforms->build($this->actor, 'studio', $this->id))->toThrow(AuthorizationException::class);
+});
+
+it('refuses waveform reads when the private asset stream is unavailable', function () {
+    ($this->receive)();
+    $this->uploads->complete($this->actor, 'studio', $this->id);
+    $store = Mockery::mock(Filesystem::class);
+    $store->shouldReceive('readStream')->once()->andReturn(false);
+    $waveforms = new AssetWaveforms($this->uploads, DB::connection(), $store, app(WaveformIndexer::class));
+    expect(fn () => $waveforms->build($this->actor, 'studio', $this->id))->toThrow(InvalidAudio::class, 'could not be opened');
+});
+
+it('refuses previews from a changed published blob and always closes the source stream', function () {
+    ($this->receive)();
+    $this->uploads->complete($this->actor, 'studio', $this->id);
+    $key = DB::table('music_media_uploads')->value('blob_key');
+    $this->disk->put($key, substr_replace($this->bytes, pack('v', 12345), 44, 2));
+    $stream = $this->disk->readStream($key);
+    $store = Mockery::mock(Filesystem::class);
+    $store->shouldReceive('readStream')->once()->andReturn($stream);
+    $waveforms = new AssetWaveforms($this->uploads, DB::connection(), $store, app(WaveformIndexer::class));
+    expect(fn () => $waveforms->build($this->actor, 'studio', $this->id))->toThrow(InvalidAudio::class, 'differs from the verified');
+    expect(is_resource($stream))->toBeFalse();
+    $this->disk->delete($key);
+    expect(fn () => app(AssetWaveforms::class)->build($this->actor, 'studio', $this->id))->toThrow(InvalidAudio::class, 'missing');
 });

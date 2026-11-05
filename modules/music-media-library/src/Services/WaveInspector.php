@@ -29,6 +29,7 @@ final class WaveInspector
         $remaining = $size - 12;
         $format = null;
         $frames = null;
+        $dataOffset = 0;
         $chunks = 0;
         while ($remaining > 0) {
             if ($remaining < 8 || ++$chunks > 4096) {
@@ -53,6 +54,7 @@ final class WaveInspector
                         throw new InvalidAudio('WAVE audio data is missing its format, duplicated or not frame aligned.');
                     }
                     $frames = intdiv($length, $format['alignment']);
+                    $dataOffset = $size - $remaining;
                 }
                 // Unknown metadata chunks are included in the checksum, without being
                 // loaded in memory or interpreted as trusted application metadata.
@@ -79,7 +81,7 @@ final class WaveInspector
             throw new InvalidAudio('Both WAVE format and audio data chunks are required.');
         }
 
-        return new AudioMetadata(hash_final($hash), $size, $format['sample_rate'], $format['channels'], $frames, $format['bits'], $format['encoding'], $format['valid_bits'], $format['channel_mask']);
+        return new AudioMetadata(hash_final($hash), $size, $format['sample_rate'], $format['channels'], $frames, $format['bits'], $format['encoding'], $format['valid_bits'], $format['channel_mask'], $dataOffset);
     }
 
     /** @return array{sample_rate: int, channels: int, alignment: int, bits: int, encoding: string, valid_bits: int, channel_mask: ?int} */

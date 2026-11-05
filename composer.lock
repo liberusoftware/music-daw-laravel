@@ -6768,7 +6768,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library",
-                "reference": "2bb9cae691fe830d66b3a25001024a1d854fe5c2"
+                "reference": "5a67f48d9db6caceb0458430addb70fb5f73ff3c"
             },
             "require": {
                 "illuminate/auth": "^13.38",
@@ -6813,7 +6813,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Verified Music media metadata and audio asset inspection.",
+            "description": "Private Music audio uploads, verified metadata and bounded waveform indexing.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

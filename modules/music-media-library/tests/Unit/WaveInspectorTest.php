@@ -44,7 +44,7 @@ it('derives immutable metadata and content address from actual audio bytes', fun
     $metadata = inspectWave($bytes);
     expect($metadata->jsonSerialize())->toBe([
         'sha256' => hash('sha256', $bytes), 'bytes' => strlen($bytes), 'sample_rate' => 48000,
-        'channels' => 2, 'frames' => 2, 'bits_per_sample' => 16, 'encoding' => 'pcm', 'valid_bits_per_sample' => 16, 'channel_mask' => null,
+        'channels' => 2, 'frames' => 2, 'bits_per_sample' => 16, 'encoding' => 'pcm', 'valid_bits_per_sample' => 16, 'channel_mask' => null, 'data_offset_bytes' => 44,
     ]);
     expect(json_decode(json_encode($metadata, JSON_THROW_ON_ERROR), true))->toBe($metadata->jsonSerialize());
     expect(fn () => $metadata->frames = 9)->toThrow(Error::class);

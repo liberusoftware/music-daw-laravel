@@ -1,6 +1,6 @@
 {
   "name": "liberusoftware/music-media-library",
-  "description": "Verified Music media metadata and audio asset inspection.",
+  "description": "Private Music audio uploads, verified metadata and bounded waveform indexing.",
   "type": "liberu-module",
   "license": "MIT",
   "version": "0.1.0",

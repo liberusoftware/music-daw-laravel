@@ -18,12 +18,13 @@ final readonly class AudioMetadata implements JsonSerializable
         public string $encoding,
         public int $validBitsPerSample,
         public ?int $channelMask,
+        public int $dataOffsetBytes,
     ) {}
 
     public function jsonSerialize(): array
     {
         return ['sha256' => $this->sha256, 'bytes' => $this->bytes, 'sample_rate' => $this->sampleRate,
             'channels' => $this->channels, 'frames' => $this->frames, 'bits_per_sample' => $this->bitsPerSample,
-            'encoding' => $this->encoding, 'valid_bits_per_sample' => $this->validBitsPerSample, 'channel_mask' => $this->channelMask];
+            'encoding' => $this->encoding, 'valid_bits_per_sample' => $this->validBitsPerSample, 'channel_mask' => $this->channelMask, 'data_offset_bytes' => $this->dataOffsetBytes];
     }
 }

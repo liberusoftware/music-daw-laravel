@@ -2,7 +2,7 @@
   "$schema": "https://schemas.liberu.dev/module/v1.json",
   "name": "music-media-library",
   "display_name": "Music Media Library",
-  "description": "Verified Music media metadata and audio asset inspection.",
+  "description": "Private Music audio uploads, verified metadata and bounded waveform indexing.",
   "version": "0.1.0",
   "category": "product",
   "provider": "Liberu\\Music\\MediaLibrary\\MusicMediaLibraryServiceProvider",
@@ -22,6 +22,7 @@
   "features": [
     "Verified audio metadata",
     "Resumable private uploads",
-    "Verified asset publication"
+    "Verified asset publication",
+    "Bounded channel waveform indexing"
   ]
 }
