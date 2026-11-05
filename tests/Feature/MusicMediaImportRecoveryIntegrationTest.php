@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Foundation\ImportExport\Contracts\TransferAuthorizer;
 use Liberu\Music\MediaLibrary\Commands\RetainAssets;
+use Liberu\Music\MediaLibrary\Data\MediaPack;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Services\AssetProcessing;
 use Liberu\Music\MediaLibrary\Services\MediaRetention;
@@ -22,20 +23,21 @@ it('imports indexes tags finds and restores retained audio through the host HTTP
     config()->set('music-media.disk', 'host-media-import-recovery');
     $disk = Storage::fake('host-media-import-recovery');
     $actor = User::factory()->create();
-    foreach (['upload', 'read', 'list', 'annotate', 'restore', 'retain', 'download'] as $operation) {
+    foreach (['upload', 'read', 'list', 'annotate', 'restore', 'retain', 'download', 'pack_read', 'pack_write', 'pack_import', 'pack_export', 'distribute'] as $operation) {
         Gate::define('music.media.'.$operation, fn ($user, $workspace) => $user->getKey() === $actor->getKey() && $workspace === 'studio');
     }
     app()->instance(MalwareScanner::class, Mockery::mock(MalwareScanner::class)->shouldReceive('clean')->twice()->andReturnTrue()->getMock());
     Bus::fake();
-    $token = $actor->createToken('music-import', ['music.media.read', 'music.media.upload', 'music.media.edit', 'music.media.process', 'music.media.restore', 'music.media.download'])->plainTextToken;
+    $token = $actor->createToken('music-import', ['music.media.read', 'music.media.upload', 'music.media.edit', 'music.media.process', 'music.media.restore', 'music.media.download', 'music.media.packs.read', 'music.media.packs.write', 'music.media.packs.import', 'music.media.packs.export'])->plainTextToken;
     $this->withToken($token);
     $format = pack('vvVVvv', 1, 1, 48000, 96000, 2, 16);
     $chunks = 'fmt '.pack('V', 16).$format.'data'.pack('V', 4).pack('v*', 0, 16384);
     $bytes = 'RIFF'.pack('V', strlen($chunks) + 4).'WAVE'.$chunks;
     $checksum = hash('sha256', $bytes);
     $base = '/api/v1/music-media/workspaces/studio';
-    $receive = function (string $id) use ($base, $bytes, $checksum, $token): void {
-        $this->withHeader('Idempotency-Key', $id)->putJson($base.'/uploads/'.$id, ['name' => 'Take.wav', 'bytes' => strlen($bytes), 'sha256' => $checksum])->assertSuccessful();
+    $rights = ['source' => 'Original takes', 'license' => 'CC-BY-4.0', 'attribution' => 'Artist'];
+    $receive = function (string $id) use ($base, $bytes, $checksum, $token, $rights): void {
+        $this->withHeader('Idempotency-Key', $id)->putJson($base.'/uploads/'.$id, ['name' => 'Take.wav', 'bytes' => strlen($bytes), 'sha256' => $checksum, 'provenance' => $rights])->assertSuccessful();
         $this->call('PUT', $base.'/uploads/'.$id.'/chunks/0', [], [], [], ['HTTP_AUTHORIZATION' => 'Bearer '.$token, 'CONTENT_TYPE' => 'application/octet-stream', 'HTTP_X_CHUNK_SHA256' => $checksum,
             'HTTP_IDEMPOTENCY_KEY' => $id.':0:'.$checksum], $bytes)->assertSuccessful();
     };
@@ -65,11 +67,21 @@ it('imports indexes tags finds and restores retained audio through the host HTTP
     $this->getJson($base.'/assets/'.$assetId)->assertSuccessful()->assertJsonPath('data.name', 'Kick')->assertJsonPath('data.available', true)->assertHeader('ETag', '"1"');
     expect(app(MediaRetention::class)->isProtected($actor, 'studio', $assetId))->toBeTrue();
     app()->instance(TransferAuthorizer::class,
-        Mockery::mock(TransferAuthorizer::class)->shouldReceive('allowed')->with((string) $actor->getKey(), 'music-media-asset', 'export')->andReturnTrue()->getMock());
+        Mockery::mock(TransferAuthorizer::class)->shouldReceive('allowed')->with((string) $actor->getKey(), Mockery::any(), Mockery::any())->andReturnTrue()->getMock());
     $url = $this->getJson($base.'/assets/'.$assetId.'/download-url')->assertSuccessful()->json('data.url');
     expect($this->get($url)->assertSuccessful()->streamedContent())->toBe($bytes);
+    Gate::define('music.media.pack_distribute', fn ($user, MediaPack $pack) => $user->getKey() === $actor->getKey() && $pack->workspaceId === 'studio');
+    $packUrl = $base.'/packs/'.Str::uuid();
+    $this->withHeaders(['Idempotency-Key' => 'pack-create', 'If-Match' => '"0"'])->putJson($packUrl, ['name' => 'Studio takes', 'asset_ids' => [$assetId], 'rights' => $rights])->assertSuccessful()->assertHeader('ETag', '"1"');
+    $manifest = $this->getJson($packUrl.'/export')->assertSuccessful()->json('data');
+    $destination = $base.'/packs/'.Str::uuid();
+    $import = ['manifest' => $manifest, 'asset_map' => [$assetId => $assetId]];
+    $this->postJson($destination.'/import-preview', $import)->assertSuccessful();
+    $this->withHeader('Idempotency-Key', 'pack-import')->putJson($destination.'/import', $import)->assertSuccessful();
+    $this->getJson($destination)->assertSuccessful()->assertJsonPath('data.assets.0.reference.id', $assetId);
     $actor->tokens()->delete();
     app('auth')->forgetGuards();
     $this->getJson($base.'/assets/'.$assetId)->assertUnauthorized();
     $this->get($url)->assertUnauthorized();
+    $this->getJson($packUrl)->assertUnauthorized();
 });

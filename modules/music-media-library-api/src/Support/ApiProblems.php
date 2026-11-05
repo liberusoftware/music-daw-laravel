@@ -41,6 +41,7 @@ final class ApiProblems
                 $field = match ($field) {
                     'upload' => $request->route('asset') === null ? 'upload_id' : 'replacement_upload_id',
                     'replacement' => 'replacement_upload_id',
+                    'map' => 'asset_map',
                     default => $field,
                 };
                 foreach ($messages as $message) {

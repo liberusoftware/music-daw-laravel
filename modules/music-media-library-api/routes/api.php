@@ -6,6 +6,7 @@ use Liberu\Music\MediaLibraryApi\Http\Controllers\AssetTasksController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\DownloadsController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\MediaController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\MetadataController;
+use Liberu\Music\MediaLibraryApi\Http\Controllers\PacksController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\UploadsController;
 use Liberu\Music\MediaLibraryApi\Http\Middleware\ApiBoundary;
 use Liberu\Music\MediaLibraryApi\Http\Middleware\RequireMedia;
@@ -13,6 +14,12 @@ use Liberu\Music\MediaLibraryApi\Http\Middleware\RequireMedia;
 Route::prefix('api/v1/music-media/workspaces/{workspace}')->where(['workspace' => '[A-Za-z0-9_-]{1,128}'])
     ->name('music.media.api.')->middleware([ApiBoundary::class, 'auth:sanctum', RequireMedia::class, 'throttle:60,1'])->group(function () {
         Route::middleware(CheckAbilities::class.':music.media.read')->group(function () {
+            Route::get('/packs/{pack}', [PacksController::class, 'show'])->whereUuid('pack')->middleware(CheckAbilities::class.':music.media.packs.read')->name('pack');
+            Route::put('/packs/{pack}', [PacksController::class, 'save'])->whereUuid('pack')->middleware(CheckAbilities::class.':music.media.packs.write')->name('pack-save');
+            Route::get('/packs/{pack}/history', [PacksController::class, 'history'])->whereUuid('pack')->middleware(CheckAbilities::class.':music.media.packs.read')->name('pack-history');
+            Route::get('/packs/{pack}/export', [PacksController::class, 'export'])->whereUuid('pack')->middleware(CheckAbilities::class.':music.media.packs.export')->name('pack-export');
+            Route::post('/packs/{pack}/import-preview', [PacksController::class, 'preview'])->whereUuid('pack')->middleware(CheckAbilities::class.':music.media.packs.import')->name('pack-preview');
+            Route::put('/packs/{pack}/import', [PacksController::class, 'import'])->whereUuid('pack')->middleware(CheckAbilities::class.':music.media.packs.import')->name('pack-import');
             Route::get('/assets/{asset}/download-url', [DownloadsController::class, 'issue'])->whereUuid('asset')->middleware(CheckAbilities::class.':music.media.download')->name('download-url');
             Route::get('/assets/{asset}/download', [DownloadsController::class, 'download'])->whereUuid('asset')->middleware(CheckAbilities::class.':music.media.download')->name('download');
             Route::put('/assets/{asset}/metadata', [MetadataController::class, 'update'])->whereUuid('asset')->middleware(CheckAbilities::class.':music.media.edit')->name('update');

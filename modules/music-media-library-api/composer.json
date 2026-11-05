@@ -1,6 +1,6 @@
 {
   "name": "liberusoftware/music-media-library-api",
-  "description": "Authorized Music uploads, private scoped downloads, conditional metadata and queued processing APIs.",
+  "description": "Authorized Music media intake, private downloads, versioned rights manifests and queued processing APIs.",
   "type": "liberu-module",
   "license": "MIT",
   "version": "0.1.0",

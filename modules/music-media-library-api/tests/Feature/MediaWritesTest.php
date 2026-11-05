@@ -307,3 +307,116 @@ it('fails closed for changed missing unverified and cross-workspace downloadable
     DB::table('music_media_uploads')->where('id', $id)->update(['status' => 'uploading']);
     $this->getJson($endpoint)->assertNotFound();
 });
+
+describe('reviewed pack manifests', function () {
+    beforeEach(function () {
+        $this->rights = ['source' => 'Studio originals', 'license' => 'CC-BY-4.0', 'attribution' => 'Artist'];
+        $this->declaration['provenance'] = $this->rights;
+        foreach (['pack_read', 'pack_write', 'pack_export', 'pack_import', 'distribute'] as $operation) {
+            app(Gate::class)->define('music.media.'.$operation, fn ($actor, $workspace) => $actor->id === 7 && in_array($workspace, ['studio', 'other']) && $this->denied !== $operation);
+        }
+        app(Gate::class)->define('music.media.pack_distribute', fn () => $this->denied !== 'pack_distribute');
+        $this->transferAllowed = true;
+        app()->instance(TransferAuthorizer::class,
+            Mockery::mock(TransferAuthorizer::class)->shouldReceive('allowed')->with('7', 'music-media-pack', Mockery::any())->andReturnUsing(fn () => $this->transferAllowed)->getMock());
+        Sanctum::actingAs($this->actor, ['music.media.read', 'music.media.upload', 'music.media.packs.read', 'music.media.packs.write', 'music.media.packs.export', 'music.media.packs.import']);
+        $this->asset = ($this->publish)();
+        $this->pack = (string) Str::uuid();
+        $this->packUrl = $this->base.'/packs/'.$this->pack;
+        $this->packBody = ['name' => 'Studio pack', 'asset_ids' => [$this->asset], 'rights' => $this->rights];
+        $this->savePack = fn (int $version = 0, string $key = 'create') => $this->withHeaders(['If-Match' => '"'.$version.'"', 'Idempotency-Key' => $key])->putJson($this->packUrl, $this->packBody);
+    });
+
+    it('saves reads and paginates immutable pack revisions with replay and conflict preconditions', function () {
+        $this->flushHeaders()->putJson($this->packUrl, $this->packBody)->assertStatus(428);
+        ($this->savePack)()->assertSuccessful()->assertHeader('ETag', '"1"')->assertJsonPath('data.rights.license', 'CC-BY-4.0');
+        ($this->savePack)()->assertSuccessful()->assertHeader('ETag', '"1"');
+        $this->packBody['name'] = 'Updated pack';
+        ($this->savePack)(1, 'update')->assertSuccessful()->assertHeader('ETag', '"2"');
+        ($this->savePack)(0, 'stale')->assertStatus(412);
+        ($this->savePack)(0, 'create')->assertConflict();
+        $this->getJson($this->packUrl)->assertSuccessful()->assertJsonPath('data.name', 'Updated pack');
+        $this->getJson($this->packUrl.'?version=1')->assertSuccessful()->assertJsonPath('data.name', 'Studio pack');
+        $first = $this->getJson($this->packUrl.'/history?page[limit]=1')->assertSuccessful()->assertJsonPath('meta.next_cursor', '2');
+        $second = $this->getJson($first->json('links.next'))->assertSuccessful()->assertJsonPath('data.0.version', 1);
+        $this->getJson($second->json('links.next'))->assertSuccessful()->assertJsonCount(0, 'data')->assertJsonPath('meta.next_cursor', null);
+        $this->getJson($this->packUrl.'/history')->assertSuccessful()->assertJsonCount(2, 'data');
+        expect(app(MediaRetention::class)->isProtected($this->actor, 'studio', $this->asset))->toBeTrue();
+        $this->getJson(str_replace('/studio/', '/other/', $this->packUrl))->assertNotFound();
+        $this->denied = 'pack_read';
+        $this->getJson($this->packUrl)->assertForbidden();
+        $this->getJson($this->packUrl.'/history')->assertForbidden();
+    });
+
+    it('exports previews and imports checksummed rights manifests with exact verified mappings', function () {
+        ($this->savePack)()->assertSuccessful();
+        $manifest = $this->getJson($this->packUrl.'/export?version=1')->assertSuccessful()->json('data');
+        expect($manifest['checksum'])->toBe(hash('sha256', json_encode($manifest['document'], JSON_THROW_ON_ERROR)))
+            ->and(json_encode($manifest))->not->toContain('blob_key', 'quarantine', 'music/assets/');
+        $destination = $this->base.'/packs/'.Str::uuid();
+        $body = ['manifest' => $manifest, 'asset_map' => [$this->asset => $this->asset]];
+        $this->postJson($destination.'/import-preview', $body)->assertSuccessful()->assertJsonPath('data.pack_id', $this->pack);
+        $this->getJson($destination)->assertNotFound();
+        $this->withHeaders(['If-Match' => '"1"', 'Idempotency-Key' => 'import'])->putJson($destination.'/import', $body)->assertUnprocessable();
+        $this->withHeaders(['If-Match' => '"0"', 'Idempotency-Key' => 'import'])->putJson($destination.'/import', $body)->assertSuccessful()->assertHeader('ETag', '"1"');
+        $this->putJson($destination.'/import', $body)->assertSuccessful();
+        $this->getJson($destination)->assertSuccessful()->assertJsonPath('data.assets.0.reference.id', $this->asset);
+        $this->transferAllowed = false;
+        $this->getJson($this->packUrl.'/export')->assertForbidden();
+        $this->postJson($destination.'/import-preview', $body)->assertForbidden();
+        $this->putJson($destination.'/import', $body)->assertForbidden();
+        $this->transferAllowed = true;
+        foreach (['distribute', 'pack_distribute'] as $denied) {
+            $this->denied = $denied;
+            $this->getJson($this->packUrl.'/export')->assertForbidden();
+        }
+    });
+
+    it('rejects malformed mappings provenance checksum drift and unauthorized pack commands', function () {
+        ($this->savePack)()->assertSuccessful();
+        $manifest = $this->getJson($this->packUrl.'/export')->assertSuccessful()->json('data');
+        $destination = $this->base.'/packs/'.Str::uuid();
+        $body = ['manifest' => $manifest, 'asset_map' => [$this->asset => $this->asset]];
+        $bad = $body;
+        $bad['manifest']['checksum'] = str_repeat('0', 64);
+        $this->postJson($destination.'/import-preview', $bad)->assertUnprocessable();
+        $bad = $body;
+        $bad['asset_map'] = [(string) Str::uuid() => $this->asset];
+        $this->postJson($destination.'/import-preview', $bad)->assertUnprocessable()->assertJsonPath('errors.0.pointer', '/asset_map');
+        $other = ($this->publish)();
+        DB::table('music_media_uploads')->where('id', $other)->update(['provenance' => json_encode(['license' => 'different'])]);
+        $bad = $body;
+        $bad['asset_map'][$this->asset] = $other;
+        $this->withHeaders(['If-Match' => '"0"', 'Idempotency-Key' => 'import'])->putJson($destination.'/import', $bad)->assertUnprocessable();
+        $this->getJson($destination)->assertNotFound();
+        $this->denied = 'read';
+        $this->getJson($this->packUrl)->assertForbidden();
+        $this->denied = 'pack_write';
+        ($this->savePack)(1, 'denied')->assertForbidden();
+        $this->denied = null;
+        Sanctum::actingAs($this->actor, ['music.media.read']);
+        foreach ([$this->packUrl, $this->packUrl.'/history', $this->packUrl.'/export'] as $url) {
+            $this->getJson($url)->assertForbidden();
+        }
+        ($this->savePack)(1, 'scope-denied')->assertForbidden();
+        $this->postJson($destination.'/import-preview', $body)->assertForbidden();
+        $this->putJson($destination.'/import', $body)->assertForbidden();
+    });
+
+    it('validates pack fields versions pagination and bounded JSON transport', function () {
+        foreach (['0', '-1', '1.5', '01', '9223372036854775808'] as $version) {
+            $this->getJson($this->packUrl.'?version='.$version)->assertUnprocessable();
+            $this->getJson($this->packUrl.'/history?page[before]='.$version)->assertUnprocessable();
+        }
+        $this->getJson($this->packUrl.'/history?page[limit]=101')->assertUnprocessable();
+        $bad = $this->packBody;
+        $bad['asset_ids'][] = $this->asset;
+        $this->withHeaders(['If-Match' => '"0"', 'Idempotency-Key' => 'invalid'])->putJson($this->packUrl, $bad)->assertUnprocessable();
+        $bad = $this->packBody;
+        unset($bad['rights']['attribution']);
+        $this->putJson($this->packUrl, $bad)->assertUnprocessable();
+        $this->postJson($this->packUrl.'/import-preview', ['manifest' => [], 'asset_map' => []])->assertUnprocessable();
+        $this->putJson($this->packUrl, $this->packBody + ['oversized' => str_repeat('x', 65537)])->assertStatus(413);
+        $this->withHeader('Content-Length', '0')->postJson($this->packUrl.'/import-preview', ['oversized' => str_repeat('x', 8388609)])->assertStatus(413);
+    });
+});

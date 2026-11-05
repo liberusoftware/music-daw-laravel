@@ -6831,7 +6831,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library-api",
-                "reference": "6e4877baa206706bc551a2c36ff5d128bb43051c"
+                "reference": "f899ccf9950a10ca15e16573a0308353a5b1e34f"
             },
             "require": {
                 "illuminate/encryption": "^13.38",
@@ -6876,7 +6876,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Authorized Music uploads, private scoped downloads, conditional metadata and queued processing APIs.",
+            "description": "Authorized Music media intake, private downloads, versioned rights manifests and queued processing APIs.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

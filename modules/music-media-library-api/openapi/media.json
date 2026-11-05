@@ -2704,6 +2704,786 @@
           }
         ]
       }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/packs/{pack}": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "pack",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "mediaPackRead",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Read a current or historical authorized pack",
+        "description": "Requires music.media.read plus the appropriate music.media.packs.read/write/import/export ability and live core policies. Import/export also require foundation transfer approval; export additionally enforces pack distribution and per-asset provenance/distribution policies. No audio or storage paths are embedded. Import creates a new pack only; preview validates source format and mapping shape, while commit verifies every destination reference and provenance. JSON transfer bodies are bounded to 8 MiB; saves to 64 KiB.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MediaPack"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong quoted metadata version; copy unchanged into If-Match for an edit.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            }
+          }
+        ]
+      },
+      "put": {
+        "operationId": "mediaPackSave",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Save pack metadata and reviewed rights with revision preconditions",
+        "description": "Requires music.media.read plus the appropriate music.media.packs.read/write/import/export ability and live core policies. Import/export also require foundation transfer approval; export additionally enforces pack distribution and per-asset provenance/distribution policies. No audio or storage paths are embedded. Import creates a new pack only; preview validates source format and mapping shape, while commit verifies every destination reference and provenance. JSON transfer bodies are bounded to 8 MiB; saves to 64 KiB.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MediaPack"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong quoted metadata version; copy unchanged into If-Match for an edit.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "One strong quoted revision. Use \"0\" for creation/import; updates use the last observed ETag.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\"(0|[1-9][0-9]{0,18})\"$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavePack"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/packs/{pack}/history": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "pack",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "mediaPackHistory",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Browse descending pack revision summaries",
+        "description": "Requires music.media.read plus the appropriate music.media.packs.read/write/import/export ability and live core policies. Import/export also require foundation transfer approval; export additionally enforces pack distribution and per-asset provenance/distribution policies. No audio or storage paths are embedded. Import creates a new pack only; preview validates source format and mapping shape, while commit verifies every destination reference and provenance. JSON transfer bodies are bounded to 8 MiB; saves to 64 KiB. page[before] is an exclusive revision number; page[limit] is 1\u2013100 (default 25). meta.next_cursor contains the next exclusive version when the page is full, and links.next gives the next request. A full final page may yield one empty page.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PackRevision"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong quoted metadata version; copy unchanged into If-Match for an edit.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "parameters": [
+          {
+            "name": "page[limit]",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "page[before]",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/packs/{pack}/export": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "pack",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "mediaPackExport",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Export a portable rights-approved checksummed manifest",
+        "description": "Requires music.media.read plus the appropriate music.media.packs.read/write/import/export ability and live core policies. Import/export also require foundation transfer approval; export additionally enforces pack distribution and per-asset provenance/distribution policies. No audio or storage paths are embedded. Import creates a new pack only; preview validates source format and mapping shape, while commit verifies every destination reference and provenance. JSON transfer bodies are bounded to 8 MiB; saves to 64 KiB.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PackManifest"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong quoted metadata version; copy unchanged into If-Match for an edit.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/packs/{pack}/import-preview": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "pack",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "mediaPackPreview",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Validate a portable manifest and exact source-to-destination identity map",
+        "description": "Requires music.media.read plus the appropriate music.media.packs.read/write/import/export ability and live core policies. Import/export also require foundation transfer approval; export additionally enforces pack distribution and per-asset provenance/distribution policies. No audio or storage paths are embedded. Import creates a new pack only; preview validates source format and mapping shape, while commit verifies every destination reference and provenance. JSON transfer bodies are bounded to 8 MiB; saves to 64 KiB.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MediaPack"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong quoted metadata version; copy unchanged into If-Match for an edit.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportPack"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/packs/{pack}/import": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "pack",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "put": {
+        "operationId": "mediaPackImport",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Import a reviewed manifest as a new retained destination pack",
+        "description": "Requires music.media.read plus the appropriate music.media.packs.read/write/import/export ability and live core policies. Import/export also require foundation transfer approval; export additionally enforces pack distribution and per-asset provenance/distribution policies. No audio or storage paths are embedded. Import creates a new pack only; preview validates source format and mapping shape, while commit verifies every destination reference and provenance. JSON transfer bodies are bounded to 8 MiB; saves to 64 KiB.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MediaPack"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong quoted metadata version; copy unchanged into If-Match for an edit.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "One strong quoted revision. Use \"0\" for creation/import; updates use the last observed ETag.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\"(0|[1-9][0-9]{0,18})\"$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportPack"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3367,6 +4147,226 @@
           "bytes": {
             "type": "integer",
             "minimum": 44
+          }
+        }
+      },
+      "PackRights": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source",
+          "license",
+          "attribution"
+        ],
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "license": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "attribution": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        }
+      },
+      "SavePack": {
+        "type": "object",
+        "required": [
+          "name",
+          "asset_ids",
+          "rights"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "asset_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1000,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "rights": {
+            "$ref": "#/components/schemas/PackRights"
+          }
+        }
+      },
+      "MediaPack": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "workspace_id",
+          "pack_id",
+          "version",
+          "name",
+          "rights",
+          "assets"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "workspace_id": {
+            "type": "string"
+          },
+          "pack_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "rights": {
+            "$ref": "#/components/schemas/PackRights"
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "reference",
+                "name",
+                "provenance"
+              ],
+              "properties": {
+                "reference": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "sha256",
+                    "sample_rate",
+                    "channels",
+                    "frames"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "sample_rate": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "channels": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "frames": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                },
+                "name": {
+                  "type": "string"
+                },
+                "provenance": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "PackManifest": {
+        "type": "object",
+        "required": [
+          "format",
+          "format_version",
+          "document",
+          "checksum"
+        ],
+        "properties": {
+          "format": {
+            "type": "string",
+            "const": "liberu.music.media-pack"
+          },
+          "format_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "document": {
+            "$ref": "#/components/schemas/MediaPack"
+          },
+          "checksum": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "ImportPack": {
+        "type": "object",
+        "required": [
+          "manifest",
+          "asset_map"
+        ],
+        "properties": {
+          "manifest": {
+            "$ref": "#/components/schemas/PackManifest"
+          },
+          "asset_map": {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 1000,
+            "additionalProperties": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "PackRevision": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "version",
+          "name",
+          "asset_count",
+          "created_at"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "asset_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "created_at": {
+            "type": "string"
           }
         }
       }

@@ -2,7 +2,7 @@
 
 Optional Laravel HTTP adapter for `liberusoftware/music-media-library`. The module is disabled by default. It invokes the core's public commands, query DTOs and policies; it owns no audio, identity or domain persistence.
 
-This is an **incomplete module increment**, not the full Media Library API release. The OpenAPI 3.1 contract in [openapi/media.json](openapi/media.json) covers verified metadata, keyset browsing, conditional metadata edits, authenticated resumable upload intake queued verification/restoration/waveform tasks and short-lived scoped downloads. Packs/provenance commands, offline pins and lifecycle HTTP operations remain to be implemented. Capability discovery advertises these limitations. The complete core/API/Filament/Livewire DAW scope remains open.
+This is an **incomplete module increment**, not the full Media Library API release. The OpenAPI 3.1 contract in [openapi/media.json](openapi/media.json) covers verified metadata, keyset browsing, conditional metadata edits, authenticated resumable upload intake, queued verification/restoration/waveform tasks, short-lived scoped downloads and versioned rights/provenance pack manifests. Offline pins, lifecycle HTTP operations and queued audio archive transfers remain to be implemented. Capability discovery advertises these limitations. The complete core/API/Filament/Livewire DAW scope remains open.
 
 ## Installation and host configuration
 
@@ -100,3 +100,20 @@ Run the core asset-task migration before enabling this increment. Job messages c
 `GET assets/{asset}/download-url` returns a signed URL valid for 60 seconds, its UTC expiry, verified SHA-256 and byte count. Both issuance and redemption require `music.media.read` and `music.media.download` token abilities, current `music.media.read`/`music.media.download` domain gates, and the foundation `TransferAuthorizer` approving `music-media-asset` / `export`. Missing foundation integration fails closed. The URL is bound to the actor, workspace, asset and immutable checksum. It is not a public sharing link: consumers send their bearer token on redemption; revoking it immediately prevents access.
 
 The download response is private `audio/wav`, uses an asset UUID attachment filename, includes the quoted checksum ETag and Content-Length, disables caching and MIME sniffing, and streams an integrity-verified temporary disk snapshot. Corrupt or missing media fails before successful response headers. Copying a snapshot uses bounded memory but requires temporary disk space and time proportional to the asset size. Range requests return 416; this contract provides full downloads and resumable uploads. No object keys, local paths or storage credentials are returned. Authorization is evaluated when the request opens the snapshot; an already streaming response cannot be recalled.
+
+### Versioned packs and rights manifests
+
+All pack routes require `music.media.read`, current Core policies, and the operation ability below. Rights records describe provenance; they do not by themselves grant distribution permission.
+
+| Method and workspace-relative route | Additional token ability | Contract |
+| --- | --- | --- |
+| GET `packs/{pack}` | `music.media.packs.read` | Latest pack, or `?version=N`; quoted revision ETag. |
+| PUT `packs/{pack}` | `music.media.packs.write` | `name`, 1–1000 distinct `asset_ids`, and `rights` containing source/license/attribution. Requires a printable Idempotency-Key and one strong quoted If-Match version; zero creates. |
+| GET `packs/{pack}/history` | `music.media.packs.read` | Descending revision summaries; `page[limit]` 1–100 (default 25), exclusive `page[before]` version. `meta.next_cursor` contains the next version and `links.next` supplies its scoped URL. A full last page can yield one empty page. |
+| GET `packs/{pack}/export` | `music.media.packs.export` | Checksummed portable manifest; optional historical `version`. Requires foundation transfer approval, current pack distribution policy, per-asset distribution permission and complete provenance. |
+| POST `packs/{pack}/import-preview` | `music.media.packs.import` | Body contains manifest object and exact source UUID → destination UUID `asset_map`. Validates source schema/checksum and map shape without writing a pack. Destination availability and reference/provenance matching are checked at commit. |
+| PUT `packs/{pack}/import` | `music.media.packs.import` | Same reviewed body; requires Idempotency-Key and If-Match `"0"`. Creates a new destination pack with verified mapped assets and retained references. |
+
+Core rechecks workspace/asset authorization and retains every saved revision atomically. Same-command replay returns its original revision; reusing the key for different content returns 409, and stale versions return 412. Reads/exports fail closed for revoked asset access, missing audio or provenance drift. Import/export require the existing foundation `TransferAuthorizer` for `music-media-pack` / `import` or `export`; missing integration denies the operation. Pack read/write/import/export gates remain separate from token abilities. Preview does not certify licensing or authorize a later commit.
+
+Save bodies are limited to 64 KiB; preview/import JSON bodies to 8 MiB, with Core's bounded portable document checks also applied. A manifest contains verified references and rights metadata, never audio, storage keys or credentials. These synchronous bounded metadata routes do not implement queued ZIP/audio archive transfer. Use the asset upload and private download contracts for audio bytes.

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add conditional replay-safe rights/provenance pack saves, historical reads, paginated revision summaries and reviewed portable manifest export/preview/import.
+- Bound pack JSON intake and preserve distinct live distribution/foundation transfer authorization.
+
 - Add private integrity-verified download snapshots with live domain and foundation transfer approval.
 - Add 60-second signed download URLs bound to actor and checksum, requiring live token scopes at redemption.
 
