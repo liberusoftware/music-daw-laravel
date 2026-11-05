@@ -6768,10 +6768,15 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library",
-                "reference": "96c32eb63e4a3c2d0759b94354ed00b977d41a35"
+                "reference": "2bb9cae691fe830d66b3a25001024a1d854fe5c2"
             },
             "require": {
+                "illuminate/auth": "^13.38",
+                "illuminate/database": "^13.38",
+                "illuminate/events": "^13.38",
+                "illuminate/filesystem": "^13.38",
                 "illuminate/support": "^13.38",
+                "illuminate/validation": "^13.38",
                 "liberusoftware/files-media": "^1.4",
                 "liberusoftware/import-export": "^1.4",
                 "liberusoftware/search": "^1.5",

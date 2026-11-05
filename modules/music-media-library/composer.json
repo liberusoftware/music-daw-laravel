@@ -9,7 +9,12 @@
     "illuminate/support": "^13.38",
     "liberusoftware/files-media": "^1.4",
     "liberusoftware/search": "^1.5",
-    "liberusoftware/import-export": "^1.4"
+    "liberusoftware/import-export": "^1.4",
+    "illuminate/auth": "^13.38",
+    "illuminate/database": "^13.38",
+    "illuminate/events": "^13.38",
+    "illuminate/filesystem": "^13.38",
+    "illuminate/validation": "^13.38"
   },
   "autoload": {
     "psr-4": {
