@@ -18,6 +18,7 @@ use Liberu\Music\Projects\Contracts\SessionMediaRetention;
 use Liberu\Music\Projects\Contracts\VerifiedMedia;
 use Liberu\Music\Projects\Data\SessionDocument;
 use Liberu\Music\Projects\Events\SessionSaved;
+use Liberu\Music\Projects\Exceptions\IdempotencyConflict;
 use Liberu\Music\Projects\Exceptions\RevisionConflict;
 use Liberu\Music\Projects\MusicProjectsServiceProvider;
 use Liberu\Music\Projects\Services\ProjectSessions;
@@ -381,4 +382,16 @@ it('rejects unbounded metadata pages and invalid history cursors', function () {
     $metadata = app(SessionMetadata::class);
     expect(fn () => $metadata->browse($this->actor, 'studio', 101))->toThrow(ValidationException::class)
         ->and(fn () => $metadata->history($this->actor, 'studio', $this->projectId, before: 0))->toThrow(ValidationException::class);
+});
+
+it('distinguishes conflicting command reuse from a stale revision through typed exceptions', function () {
+    $this->sessions->save($this->actor, ($this->command)());
+    expect(fn () => $this->sessions->save($this->actor, new SaveSession('studio', $this->projectId, 'Changed', SessionDocument::empty(), 0, 'create')))
+        ->toThrow(IdempotencyConflict::class);
+    try {
+        $this->sessions->save($this->actor, ($this->command)(0, 'stale'));
+        test()->fail('Expected a stale revision conflict.');
+    } catch (RevisionConflict $exception) {
+        expect($exception)->not->toBeInstanceOf(IdempotencyConflict::class);
+    }
 });

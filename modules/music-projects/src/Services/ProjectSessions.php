@@ -23,6 +23,7 @@ use Liberu\Music\Projects\Data\SessionImportPreview;
 use Liberu\Music\Projects\Data\SessionPage;
 use Liberu\Music\Projects\Data\SessionRevision;
 use Liberu\Music\Projects\Events\SessionSaved;
+use Liberu\Music\Projects\Exceptions\IdempotencyConflict;
 use Liberu\Music\Projects\Exceptions\RevisionConflict;
 use LogicException;
 
@@ -63,7 +64,7 @@ final readonly class ProjectSessions
                 ->where('idempotency_key', $command->idempotencyKey)->first();
             if ($replay !== null) {
                 if (! hash_equals($replay->fingerprint, $fingerprint)) {
-                    throw new RevisionConflict('The idempotency key was already used for a different command.');
+                    throw new IdempotencyConflict('The idempotency key was already used for a different command.');
                 }
 
                 $revision = $this->revision($replay);

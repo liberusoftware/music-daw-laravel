@@ -6,4 +6,4 @@ namespace Liberu\Music\Projects\Exceptions;
 
 use RuntimeException;
 
-final class RevisionConflict extends RuntimeException {}
+class RevisionConflict extends RuntimeException {}
