@@ -6768,7 +6768,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library",
-                "reference": "7278c0b9f59cc065335e32190c3321a9e7d2078c"
+                "reference": "b74584518982576f765752d33e9f7a5934b532d2"
             },
             "require": {
                 "ext-zip": "*",
@@ -6819,7 +6819,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Verified Music audio, reviewed packs, upload budgets, queued waveforms and recoverable reference-safe asset cleanup.",
+            "description": "Verified Music audio, queued publication/restoration, reviewed packs, budgets and reference-safe cleanup.",
             "transport-options": {
                 "symlink": true,
                 "relative": true
@@ -6831,7 +6831,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library-api",
-                "reference": "9a95617412b03144e66efebbeff7616d7ae07c19"
+                "reference": "42b2c5e7bc18451a415de5067dbdd7dbb763707d"
             },
             "require": {
                 "illuminate/encryption": "^13.38",
@@ -6876,7 +6876,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Authorized Music asset metadata, keyset browsing, upload budgets and cancellable waveform jobs.",
+            "description": "Authorized Music uploads, conditional metadata and queued verification, restoration and waveform APIs.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

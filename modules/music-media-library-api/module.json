@@ -2,7 +2,7 @@
   "$schema": "https://schemas.liberu.dev/module/v1.json",
   "name": "music-media-library-api",
   "display_name": "Music Media Library API",
-  "description": "Authorized Music asset metadata, keyset browsing, upload budgets and cancellable waveform jobs.",
+  "description": "Authorized Music uploads, conditional metadata and queued verification, restoration and waveform APIs.",
   "version": "0.1.0",
   "category": "presentation",
   "provider": "Liberu\\Music\\MediaLibraryApi\\MusicMediaLibraryApiServiceProvider",
@@ -20,6 +20,9 @@
   "features": [
     "Authorized verified asset metadata and keyset search",
     "Scoped upload reservation views",
-    "Owned cancellable waveform task status and cached results"
+    "Owned cancellable waveform task status and cached results",
+    "Resumable authenticated checksum-verified chunk intake",
+    "Conditional replay-safe asset metadata commands",
+    "Owned queued verification and original-identity restoration"
   ]
 }

@@ -23,8 +23,8 @@ final class MediaController
     {
         $access->authorize($request->user(), $workspace, '*', 'list');
 
-        return $this->response($request, ['schema_version' => 1, 'operations' => ['browse', 'read', 'upload_budget', 'waveform_request', 'waveform_status', 'waveform_result', 'waveform_cancel'],
-            'unsupported' => ['asset_transfer', 'upload_verification_jobs', 'metadata_edits', 'packs', 'lifecycle_commands', 'native_audio_execution']]);
+        return $this->response($request, ['schema_version' => 1, 'operations' => ['browse', 'read', 'metadata_update', 'upload_declare', 'upload_chunk', 'upload_status', 'upload_cancel', 'asset_verify', 'asset_restore', 'asset_task_status', 'asset_task_result', 'asset_task_cancel', 'upload_budget', 'waveform_request', 'waveform_status', 'waveform_result', 'waveform_cancel'],
+            'unsupported' => ['scoped_download_urls', 'packs', 'lifecycle_commands', 'native_audio_execution']]);
     }
 
     public function index(BrowseMediaRequest $request, MediaCatalog $catalog, CatalogCursor $cursors, string $workspace): JsonResponse
@@ -39,7 +39,9 @@ final class MediaController
 
     public function show(Request $request, MediaCatalog $catalog, string $workspace, string $asset): JsonResponse
     {
-        return $this->response($request, $catalog->get($request->user(), $workspace, $asset));
+        $metadata = $catalog->get($request->user(), $workspace, $asset);
+
+        return $this->response($request, $metadata)->header('ETag', '"'.$metadata->version.'"');
     }
 
     public function budget(Request $request, UploadBudgets $budgets, string $workspace): JsonResponse

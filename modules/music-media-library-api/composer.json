@@ -1,6 +1,6 @@
 {
   "name": "liberusoftware/music-media-library-api",
-  "description": "Authorized Music asset metadata, keyset browsing, upload budgets and cancellable waveform jobs.",
+  "description": "Authorized Music uploads, conditional metadata and queued verification, restoration and waveform APIs.",
   "type": "liberu-module",
   "license": "MIT",
   "version": "0.1.0",

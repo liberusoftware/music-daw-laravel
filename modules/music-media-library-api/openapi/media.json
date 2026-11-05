@@ -3,7 +3,7 @@
   "info": {
     "title": "Music Media Library API",
     "version": "0.1.0",
-    "description": "Initial read and waveform-task contract. Abilities: music.media.read for queries, music.media.process plus read for task mutation, music.media.quota.read for budgets. Binary transfer, upload verification, edits, packs and lifecycle HTTP operations are explicitly unsupported in this increment. No native audio/device execution.",
+    "description": "Authorized Media Library metadata, resumable authenticated uploads and queued verification/restoration/waveform jobs. Read, edit, upload, restore, process and quota abilities remain separate and never replace core policies. Scoped download URLs, packs, pins and lifecycle HTTP commands remain unfinished. No native/device audio execution.",
     "license": {
       "name": "MIT",
       "identifier": "MIT"
@@ -45,7 +45,7 @@
           "Media"
         ],
         "summary": "Discover supported Media Library operations",
-        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval. Required abilities: see the operation table in README.",
         "responses": {
           "200": {
             "description": "Authorized result.",
@@ -137,7 +137,7 @@
           "Media"
         ],
         "summary": "Browse verified assets by descending UUID keyset",
-        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval. Required abilities: see the operation table in README.",
         "responses": {
           "200": {
             "description": "Authorized result.",
@@ -290,7 +290,7 @@
           "Media"
         ],
         "summary": "Read current verified asset metadata and availability",
-        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval. Required abilities: see the operation table in README.",
         "responses": {
           "200": {
             "description": "Authorized result.",
@@ -333,6 +333,14 @@
                       }
                     }
                   }
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong quoted metadata version; copy unchanged into If-Match for an edit.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -382,7 +390,7 @@
           "Media"
         ],
         "summary": "Read a workspace logical upload reservation budget",
-        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval. Required abilities: see the operation table in README.",
         "responses": {
           "200": {
             "description": "Authorized result.",
@@ -483,7 +491,7 @@
           "Media"
         ],
         "summary": "Read an owned task and coarse progress",
-        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval. Required abilities: see the operation table in README.",
         "responses": {
           "200": {
             "description": "Authorized result.",
@@ -528,6 +536,14 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "Location": {
+                "description": "Owned task status URI.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "default": {
@@ -562,7 +578,7 @@
           "Media"
         ],
         "summary": "Request or replay an owned waveform task",
-        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval. Required abilities: see the operation table in README.",
         "responses": {
           "200": {
             "description": "Authorized result.",
@@ -605,6 +621,14 @@
                       }
                     }
                   }
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Owned task status URI.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -653,6 +677,14 @@
                       }
                     }
                   }
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Owned task status URI.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -735,7 +767,7 @@
           "Media"
         ],
         "summary": "Cancel a queued or in-flight owned task",
-        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval. Required abilities: see the operation table in README.",
         "responses": {
           "200": {
             "description": "Authorized result.",
@@ -778,6 +810,14 @@
                       }
                     }
                   }
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Owned task status URI.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -860,7 +900,7 @@
           "Media"
         ],
         "summary": "Read derived peaks without synchronous indexing",
-        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval. Required abilities: see the operation table in README.",
         "responses": {
           "200": {
             "description": "Authorized result.",
@@ -953,6 +993,14 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "const": 2
+                }
+              }
             }
           },
           "410": {
@@ -985,6 +1033,1448 @@
           },
           "500": {
             "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/assets/{asset}/metadata": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "asset",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "put": {
+        "operationId": "mediaUpdateMetadata",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Replace asset name and tags with revision and retry protection",
+        "description": "Core policies and Sanctum scopes are both required. Mutation JSON is bounded to 8 KiB; binary chunks to 4 MiB. Idempotency applies to the documented operation identity. Required abilities: music.media.read + music.media.edit.",
+        "responses": {
+          "200": {
+            "description": "Authorized result or original command receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MetadataReceipt"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong quoted metadata version; copy unchanged into If-Match for an edit.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetadataEdit"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Stable printable ASCII key. For task/declaration commands this must equal the path UUID; for chunks use upload UUID:offset:sha256."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"(0|[1-9][0-9]{0,18})\"$"
+            },
+            "description": "Exactly one strong quoted metadata version from GET asset ETag; no wildcard, weak tag or list. Original-key replay uses the original precondition."
+          }
+        ]
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/uploads/{upload}": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "upload",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "put": {
+        "operationId": "mediaDeclareUpload",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Declare a resumable private upload and reserve capacity",
+        "description": "Core policies and Sanctum scopes are both required. Mutation JSON is bounded to 8 KiB; binary chunks to 4 MiB. Idempotency applies to the documented operation identity. Required abilities: music.media.upload.",
+        "responses": {
+          "200": {
+            "description": "Authorized result or original command receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/UploadProgress"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadDeclaration"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Stable printable ASCII key. For task/declaration commands this must equal the path UUID; for chunks use upload UUID:offset:sha256."
+          }
+        ]
+      },
+      "get": {
+        "operationId": "mediaUploadStatus",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Read workspace-authorized upload byte progress",
+        "description": "Core policies and Sanctum scopes are both required. Mutation JSON is bounded to 8 KiB; binary chunks to 4 MiB. Idempotency applies to the documented operation identity. Required abilities: music.media.upload.",
+        "responses": {
+          "200": {
+            "description": "Authorized result or original command receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/UploadProgress"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "mediaCancelUpload",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Cancel an unpublished upload without bypassing quarantine grace",
+        "description": "Core policies and Sanctum scopes are both required. Mutation JSON is bounded to 8 KiB; binary chunks to 4 MiB. Idempotency applies to the documented operation identity. Required abilities: music.media.upload.",
+        "responses": {
+          "200": {
+            "description": "Authorized result or original command receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/UploadProgress"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Stable printable ASCII key. For task/declaration commands this must equal the path UUID; for chunks use upload UUID:offset:sha256."
+          }
+        ]
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/uploads/{upload}/chunks/{offset}": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "upload",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "offset",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1073741824
+          }
+        }
+      ],
+      "put": {
+        "operationId": "mediaAppendChunk",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Append or replay a verified resumable byte chunk",
+        "description": "Core policies and Sanctum scopes are both required. Mutation JSON is bounded to 8 KiB; binary chunks to 4 MiB. Idempotency applies to the documented operation identity. Required abilities: music.media.upload.",
+        "responses": {
+          "200": {
+            "description": "Authorized result or original command receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/UploadProgress"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Stable printable ASCII key. For task/declaration commands this must equal the path UUID; for chunks use upload UUID:offset:sha256."
+          },
+          {
+            "name": "X-Chunk-SHA256",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "description": "SHA-256 of exactly the raw chunk bytes."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "minLength": 1,
+                "maxLength": 4194304
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/verification-tasks/{task}": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "put": {
+        "operationId": "mediaVerifyUpload",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Queue verified publication after all upload bytes arrive",
+        "description": "Core policies and Sanctum scopes are both required. Mutation JSON is bounded to 8 KiB; binary chunks to 4 MiB. Idempotency applies to the documented operation identity. Required abilities: music.media.read + music.media.upload.",
+        "responses": {
+          "200": {
+            "description": "Authorized result or original command receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AssetTask"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Owned task status URI.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Queued work; follow owned status/result links.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AssetTask"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Owned task status URI.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "upload_id"
+                ],
+                "properties": {
+                  "upload_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Stable printable ASCII key. For task/declaration commands this must equal the path UUID; for chunks use upload UUID:offset:sha256."
+          }
+        ]
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/assets/{asset}/restoration-tasks/{task}": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "asset",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "put": {
+        "operationId": "mediaRestoreAsset",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Queue original-checksum restoration while preserving references",
+        "description": "Core policies and Sanctum scopes are both required. Mutation JSON is bounded to 8 KiB; binary chunks to 4 MiB. Idempotency applies to the documented operation identity. Required abilities: music.media.read + music.media.restore.",
+        "responses": {
+          "200": {
+            "description": "Authorized result or original command receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AssetTask"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Owned task status URI.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Queued work; follow owned status/result links.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AssetTask"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Owned task status URI.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "replacement_upload_id"
+                ],
+                "properties": {
+                  "replacement_upload_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Stable printable ASCII key. For task/declaration commands this must equal the path UUID; for chunks use upload UUID:offset:sha256."
+          }
+        ]
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/asset-tasks/{task}": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "mediaAssetTaskStatus",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Read owned verification or restoration progress",
+        "description": "Core policies and Sanctum scopes are both required. Mutation JSON is bounded to 8 KiB; binary chunks to 4 MiB. Idempotency applies to the documented operation identity. Required abilities: music.media.read + operation-specific music.media.upload or music.media.restore.",
+        "responses": {
+          "200": {
+            "description": "Authorized result or original command receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AssetTask"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Owned task status URI.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "mediaCancelAssetTask",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Cancel owned queued work before its publication transaction wins",
+        "description": "Core policies and Sanctum scopes are both required. Mutation JSON is bounded to 8 KiB; binary chunks to 4 MiB. Idempotency applies to the documented operation identity. Required abilities: music.media.read + operation-specific music.media.upload or music.media.restore.",
+        "responses": {
+          "200": {
+            "description": "Authorized result or original command receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AssetTask"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Owned task status URI.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Stable printable ASCII key. For task/declaration commands this must equal the path UUID; for chunks use upload UUID:offset:sha256."
+          }
+        ]
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/asset-tasks/{task}/result": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "mediaAssetTaskResult",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Read the current verified result reference",
+        "description": "Core policies and Sanctum scopes are both required. Mutation JSON is bounded to 8 KiB; binary chunks to 4 MiB. Idempotency applies to the documented operation identity. Required abilities: music.media.read + operation-specific music.media.upload or music.media.restore.",
+        "responses": {
+          "200": {
+            "description": "Authorized result or original command receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AssetReference"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "202": {
+            "description": "Still queued; Retry-After is supplied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AssetTask"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "const": 2
+                }
+              }
+            }
           }
         }
       }
@@ -1354,6 +2844,271 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "MetadataEdit": {
+        "type": "object",
+        "required": [
+          "name",
+          "tags"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "tags": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          }
+        }
+      },
+      "MetadataReceipt": {
+        "type": "object",
+        "required": [
+          "asset_id",
+          "name",
+          "tags",
+          "version"
+        ],
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "UploadDeclaration": {
+        "type": "object",
+        "required": [
+          "name",
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 44,
+            "maximum": 1073741824
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "source": {
+                "type": "string",
+                "maxLength": 2048
+              },
+              "license": {
+                "type": "string",
+                "maxLength": 2048
+              },
+              "attribution": {
+                "type": "string",
+                "maxLength": 2048
+              }
+            }
+          }
+        }
+      },
+      "UploadProgress": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "upload_id",
+          "workspace_id",
+          "status",
+          "received_bytes",
+          "total_bytes"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "upload_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspace_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "uploading",
+              "ready",
+              "cancelled",
+              "trashed",
+              "purging",
+              "collected"
+            ]
+          },
+          "received_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_bytes": {
+            "type": "integer",
+            "minimum": 44
+          }
+        }
+      },
+      "AssetTask": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "workspace_id",
+          "asset_id",
+          "status",
+          "terminal",
+          "cancellable",
+          "progress",
+          "kind",
+          "upload_id",
+          "error_code"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspace_id": {
+            "type": "string"
+          },
+          "asset_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "ready",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "terminal": {
+            "type": "boolean"
+          },
+          "cancellable": {
+            "type": "boolean"
+          },
+          "progress": {
+            "type": "object",
+            "required": [
+              "completed_steps",
+              "total_steps",
+              "unit"
+            ],
+            "properties": {
+              "completed_steps": {
+                "type": "integer",
+                "enum": [
+                  0,
+                  1
+                ]
+              },
+              "total_steps": {
+                "type": "integer",
+                "const": 1
+              },
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "asset_verification",
+                  "asset_restoration"
+                ]
+              }
+            }
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "verify_upload",
+              "restore_asset"
+            ]
+          },
+          "upload_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "asset_processing_failed",
+              null
+            ]
+          }
+        }
+      },
+      "AssetReference": {
+        "type": "object",
+        "required": [
+          "id",
+          "sha256",
+          "sample_rate",
+          "channels",
+          "frames"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "sample_rate": {
+            "type": "integer",
+            "description": "Sample frames per second (Hz)."
+          },
+          "channels": {
+            "type": "integer"
+          },
+          "frames": {
+            "type": "integer",
+            "description": "Verified sample-frame count."
           }
         }
       }
