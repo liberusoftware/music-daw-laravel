@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schemas.liberu.dev/module/v1.json",
+  "name": "music-projects-api",
+  "display_name": "Music Projects API",
+  "description": "Authorized HTTP metadata and portable import preview adapter for Music Projects.",
+  "version": "0.1.0",
+  "category": "presentation",
+  "provider": "Liberu\\Music\\ProjectsApi\\MusicProjectsApiServiceProvider",
+  "requires": {
+    "php": "^8.5",
+    "laravel": "^13.0",
+    "packages": {
+      "liberusoftware/music-projects": "^0.1 || dev-main"
+    }
+  },
+  "capabilities": [
+    "music.projects.api"
+  ],
+  "default_enabled": false,
+  "features": [
+    "Authorized session metadata queries",
+    "Portable manifest import preview"
+  ]
+}

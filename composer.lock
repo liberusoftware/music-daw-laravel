@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4092dc40e21e5707dc26710579f9d490",
+    "content-hash": "e73a84a3714a0e5d0975308317909c40",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -6871,6 +6871,62 @@
                 "MIT"
             ],
             "description": "Actor-authorized Music session documents, revisions, transactional media retention and autosave recovery.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "liberusoftware/music-projects-api",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "modules/music-projects-api",
+                "reference": "5171842b3929ab3570d10f01d61c1d107df275c9"
+            },
+            "require": {
+                "illuminate/http": "^13.38",
+                "illuminate/routing": "^13.38",
+                "illuminate/validation": "^13.38",
+                "laravel/sanctum": "^4.3",
+                "liberusoftware/music-projects": "^0.1 || dev-main",
+                "php": "^8.5"
+            },
+            "require-dev": {
+                "liberusoftware/package-testbench": "^1.8",
+                "pestphp/pest": "^5.3"
+            },
+            "type": "liberu-module",
+            "extra": {
+                "liberu": {
+                    "name": "music-projects-api"
+                },
+                "laravel": {
+                    "providers": []
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Liberu\\Music\\ProjectsApi\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Liberu\\Music\\ProjectsApi\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ],
+                "test:coverage": [
+                    "pest --coverage --min=100"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Authorized HTTP metadata and portable import preview adapter for Music Projects.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

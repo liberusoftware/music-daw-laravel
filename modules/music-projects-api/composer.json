@@ -1,0 +1,55 @@
+{
+  "name": "liberusoftware/music-projects-api",
+  "description": "Authorized HTTP metadata and portable import preview adapter for Music Projects.",
+  "type": "liberu-module",
+  "license": "MIT",
+  "version": "0.1.0",
+  "repositories": [
+    {
+      "type": "git",
+      "url": "https://github.com/liberusoftware/module-music-projects"
+    }
+  ],
+  "require": {
+    "php": "^8.5",
+    "illuminate/http": "^13.38",
+    "illuminate/routing": "^13.38",
+    "illuminate/validation": "^13.38",
+    "liberusoftware/music-projects": "^0.1 || dev-main",
+    "laravel/sanctum": "^4.3"
+  },
+  "autoload": {
+    "psr-4": {
+      "Liberu\\Music\\ProjectsApi\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Liberu\\Music\\ProjectsApi\\Tests\\": "tests/"
+    }
+  },
+  "require-dev": {
+    "liberusoftware/package-testbench": "^1.8",
+    "pestphp/pest": "^5.3"
+  },
+  "extra": {
+    "liberu": {
+      "name": "music-projects-api"
+    },
+    "laravel": {
+      "providers": []
+    }
+  },
+  "scripts": {
+    "test": "pest",
+    "test:coverage": "pest --coverage --min=100"
+  },
+  "config": {
+    "allow-plugins": {
+      "pestphp/pest-plugin": true
+    },
+    "github-protocols": [
+      "https"
+    ]
+  }
+}

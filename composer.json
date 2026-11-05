@@ -13,6 +13,13 @@
     "repositories": [
         {
             "type": "path",
+            "url": "modules/music-projects-api",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
             "url": "modules/music-media-library",
             "options": {
                 "symlink": true
@@ -435,6 +442,7 @@
         "liberusoftware/module-manager-filament": "^1.1",
         "liberusoftware/music-media-library": "^0.1",
         "liberusoftware/music-projects": "^0.1",
+        "liberusoftware/music-projects-api": "^0.1",
         "liberusoftware/notifications": "^1.0",
         "liberusoftware/observability": "^1.0",
         "liberusoftware/organizations-teams": "^1.0",

@@ -1,0 +1,33 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, intl, pdo_sqlite
+          coverage: pcov
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npx --yes @redocly/cli@2.15.0 lint openapi/projects.json
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: vendor/bin/phpstan analyse src --level=5 --no-progress --memory-limit=512M
+      - run: composer test:coverage -- --coverage-clover=coverage/clover.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage/clover.xml
