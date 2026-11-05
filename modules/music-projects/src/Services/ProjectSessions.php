@@ -19,6 +19,7 @@ use Liberu\Music\Projects\Contracts\SessionMediaRetention;
 use Liberu\Music\Projects\Contracts\VerifiedMedia;
 use Liberu\Music\Projects\Data\RetentionBackfillStatus;
 use Liberu\Music\Projects\Data\SessionDocument;
+use Liberu\Music\Projects\Data\SessionImportPreview;
 use Liberu\Music\Projects\Data\SessionPage;
 use Liberu\Music\Projects\Data\SessionRevision;
 use Liberu\Music\Projects\Events\SessionSaved;
@@ -218,6 +219,21 @@ final readonly class ProjectSessions
 
     public function import(Authenticatable $actor, string $workspaceId, string $projectId, string $manifest, string $idempotencyKey): SessionRevision
     {
+        $preview = $this->parseImport($actor, $workspaceId, $projectId, $manifest);
+
+        return $this->save($actor, new SaveSession($workspaceId, $projectId, $preview->title, $preview->document, 0, $idempotencyKey));
+    }
+
+    public function previewImport(Authenticatable $actor, string $workspaceId, string $projectId, string $manifest): SessionImportPreview
+    {
+        $preview = $this->parseImport($actor, $workspaceId, $projectId, $manifest);
+        $this->verifyMedia($actor, $workspaceId, $preview->document);
+
+        return $preview;
+    }
+
+    private function parseImport(Authenticatable $actor, string $workspaceId, string $projectId, string $manifest): SessionImportPreview
+    {
         $this->access->authorize($actor, $workspaceId, $projectId, 'write');
         if (strlen($manifest) > 17 * 1024 * 1024) {
             throw ValidationException::withMessages(['manifest' => 'Portable manifests may not exceed 17 MiB.']);
@@ -233,7 +249,11 @@ final readonly class ProjectSessions
             throw ValidationException::withMessages(['checksum' => 'The session manifest checksum does not match.']);
         }
 
-        return $this->save($actor, new SaveSession($workspaceId, $projectId, $payload['title'], $document, 0, $idempotencyKey));
+        // Validate the destination command without reserving an identity, writing
+        // a revision, retaining assets or dispatching a saved event.
+        new SaveSession($workspaceId, $projectId, $payload['title'], $document, 0, 'preview');
+
+        return new SessionImportPreview($payload['title'], $document);
     }
 
     private function revisions(string $workspaceId, string $projectId): Builder

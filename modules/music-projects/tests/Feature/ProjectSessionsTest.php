@@ -294,3 +294,45 @@ it('fails closed without retention and rolls retention back when a revision cann
     $sessions->save($this->actor, $command);
     expect(DB::table('retention_spy')->count())->toBe(1)->and(DB::table('music_project_revisions')->count())->toBe(1);
 });
+
+it('previews a portable session without writing revisions retaining assets or emitting events', function () {
+    $document = SessionDocument::empty();
+    $manifest = json_encode(['format' => 'liberu.music.session', 'format_version' => 1, 'title' => 'Preview song', 'document' => $document, 'checksum' => $document->checksum()], JSON_THROW_ON_ERROR);
+    $preview = $this->sessions->previewImport($this->actor, 'studio', $this->projectId, $manifest);
+    expect($preview->jsonSerialize())->toBe([
+        'schema_version' => 1, 'title' => 'Preview song', 'document_schema_version' => 1,
+        'checksum' => $document->checksum(), 'track_count' => 0, 'asset_count' => 0, 'module_names' => [],
+    ])->and($preview->document->jsonSerialize())->toBe($document->jsonSerialize())
+        ->and(DB::table('music_projects')->count())->toBe(0)
+        ->and(DB::table('music_project_revisions')->count())->toBe(0)
+        ->and($this->savedEvents)->toBe([]);
+    expect(fn () => $this->sessions->previewImport(new GenericUser(['id' => 2]), 'studio', $this->projectId, $manifest))->toThrow(AuthorizationException::class)
+        ->and(fn () => $this->sessions->previewImport($this->actor, 'studio', 'invalid-destination', $manifest))->toThrow(ValidationException::class);
+    app(Gate::class)->define('music.projects.write', fn () => false);
+    expect(fn () => $this->sessions->import($this->actor, 'studio', $this->projectId, $manifest, 'confirmed'))->toThrow(AuthorizationException::class);
+    expect(DB::table('music_project_revisions')->count())->toBe(0);
+});
+
+it('revalidates referenced media for preview and confirmation without requiring retention during preview', function () {
+    $asset = ['id' => 'external-media', 'sha256' => str_repeat('a', 64), 'sample_rate' => 48000, 'channels' => 1, 'frames' => 48000];
+    $input = SessionDocument::empty()->jsonSerialize();
+    $input['assets'] = [$asset];
+    $document = SessionDocument::fromArray($input);
+    $manifest = json_encode(['format' => 'liberu.music.session', 'format_version' => 1, 'title' => 'Audio preview', 'document' => $document, 'checksum' => $document->checksum()], JSON_THROW_ON_ERROR);
+    $access = Mockery::mock(MediaAccess::class);
+    $access->shouldReceive('authorized')->andReturn(true);
+    app()->instance(MediaAccess::class, $access);
+    $media = Mockery::mock(VerifiedMedia::class);
+    $media->shouldReceive('resolve')->once()->with($this->actor, 'studio', 'external-media')->andReturn($asset);
+    app()->instance(VerifiedMedia::class, $media);
+    $retention = Mockery::mock(SessionMediaRetention::class);
+    $retention->shouldNotReceive('retain');
+    app()->instance(SessionMediaRetention::class, $retention);
+    $sessions = app(ProjectSessions::class);
+    expect($sessions->previewImport($this->actor, 'studio', $this->projectId, $manifest)->jsonSerialize()['asset_count'])->toBe(1)
+        ->and(DB::table('music_project_revisions')->count())->toBe(0);
+    $revoked = Mockery::mock(MediaAccess::class);
+    $revoked->shouldReceive('authorized')->andReturn(false);
+    app()->instance(MediaAccess::class, $revoked);
+    expect(fn () => app(ProjectSessions::class)->import($this->actor, 'studio', $this->projectId, $manifest, 'confirm'))->toThrow(AuthorizationException::class);
+});
