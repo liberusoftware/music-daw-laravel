@@ -2,7 +2,7 @@
   "$schema": "https://schemas.liberu.dev/module/v1.json",
   "name": "music-media-library",
   "display_name": "Music Media Library",
-  "description": "Private Music audio uploads, verified metadata and bounded waveform indexing.",
+  "description": "Private Music audio uploads, verified waveforms and authorized tagged media catalogs.",
   "version": "0.1.0",
   "category": "product",
   "provider": "Liberu\\Music\\MediaLibrary\\MusicMediaLibraryServiceProvider",
@@ -24,6 +24,8 @@
     "Resumable private uploads",
     "Verified asset publication",
     "Bounded channel waveform indexing",
-    "Scoped foundation media authorization"
+    "Scoped foundation media authorization",
+    "Versioned media names and tags",
+    "Workspace-scoped media search"
   ]
 }

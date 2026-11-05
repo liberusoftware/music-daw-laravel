@@ -1,6 +1,6 @@
 {
   "name": "liberusoftware/music-media-library",
-  "description": "Private Music audio uploads, verified metadata and bounded waveform indexing.",
+  "description": "Private Music audio uploads, verified waveforms and authorized tagged media catalogs.",
   "type": "liberu-module",
   "license": "MIT",
   "version": "0.1.0",
@@ -14,7 +14,8 @@
     "illuminate/database": "^13.38",
     "illuminate/events": "^13.38",
     "illuminate/filesystem": "^13.38",
-    "illuminate/validation": "^13.38"
+    "illuminate/validation": "^13.38",
+    "illuminate/pagination": "^13.38"
   },
   "autoload": {
     "psr-4": {

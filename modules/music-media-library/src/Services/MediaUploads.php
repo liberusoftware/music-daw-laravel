@@ -10,6 +10,7 @@ use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
@@ -40,6 +41,7 @@ final readonly class MediaUploads
             $this->database->table('music_media_uploads')->insertOrIgnore([
                 'id' => $command->uploadId, 'workspace_id' => $command->workspaceId,
                 'actor_id' => (string) $actor->getAuthIdentifier(), 'name' => $command->name,
+                'search_name' => Str::lower($command->name),
                 'total_bytes' => $command->bytes, 'received_bytes' => 0, 'sha256' => $command->sha256,
                 'fingerprint' => $fingerprint, 'status' => 'uploading',
                 'provenance' => json_encode($command->provenance, JSON_THROW_ON_ERROR), 'created_at' => now(), 'updated_at' => now(),

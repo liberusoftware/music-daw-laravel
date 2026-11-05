@@ -10,7 +10,7 @@
 
 Liberu Music is the Laravel host skeleton for a proposed modular Digital Audio Workstation for songwriters, musicians, producers, composers and mix engineers. It starts from [Liberu Boilerplate](https://github.com/liberusoftware/project-boilerplate-laravel-filament/tree/95f445a2901f2296959bec24229c6a1d5d5a6815), preserving its application structure and shared foundation modules and themes.
 
-**Status: initial skeleton.** Music-specific capabilities are planned, not implemented. The 88 separate module repositories contain README placeholders only; they are not installable Composer packages and are not required by this host. No audio engine, recording, editing, endpoints or Music UI is provided yet.
+**Status: under development.** Projects core and Media Library core are installed from `modules/`, with independently tested implementations synchronized to their separate repositories. The remaining Music packages and the complete DAW are unfinished. No native audio engine, physical recording support or Music UI is provided yet. See the [delivery roadmap](https://github.com/liberusoftware/project-music-daw-laravel-filament/issues/94) for acceptance tracking.
 
 ## Planned product capabilities
 
@@ -83,7 +83,7 @@ tests/       # inherited application and architecture checks
 themes/      # inherited shared themes
 ```
 
-Each Music capability has separate core, API, Livewire and Filament repository placeholders. Core repositories use `module-music-<capability>`; adapters append `-api`, `-livewire` or `-filament`. See the [complete repository catalogue](MUSIC-MODULES.md).
+Each Music capability has separate core, API, Livewire and Filament repositories; implementation status is tracked on GitHub. Core repositories use `module-music-<capability>`; adapters append `-api`, `-livewire` or `-filament`. See the [complete repository catalogue](MUSIC-MODULES.md).
 
 Laravel owns project metadata, authorization, revision manifests, asset policy and asynchronous jobs. A separately designed native/local engine owns audio graph execution, DSP, sample scheduling, recording buffers and devices. PHP, database access and network requests must never execute in the audio callback. Filament supports operations and Livewire supports project management/review; neither is the real-time engine.
 
@@ -96,9 +96,9 @@ composer test
 npm run build
 ```
 
-These are inherited foundation checks, not evidence of DAW support. No Music implementation or audio correctness tests are included at this stage. Dependencies and lockfiles retain the boilerplate versions.
+The host suite includes Music composition tests. Each implemented Music package also runs independently through the Liberu package testbench and enforces 100% source line coverage. Host coverage includes `modules/*/src` and currently remains below its required 100% gate. These tests do not establish native engine or physical-device support.
 
-Inherited GitHub Actions definitions are preserved as `.github/workflow-templates/*.yml.example` templates because the provisioning token lacks the `workflow` scope. Move them into `.github/workflows/` and rename them to `.yml` when publishing with credentials that have that scope. The package publishing workflow also requires organization secrets; review it before enabling publication from this host. Music placeholders have no release tags or Packagist submissions.
+Current Music host install/test definitions are preserved as `.github/workflow-templates/music-host-*.yml.example`; the Media Library package carries its own inactive install/test templates. Publishing active GitHub Actions workflows remains pending credentials with the `workflow` scope. Inherited publishing templates also require organization secrets and review before activation. No complete Music module release or new CI success is claimed.
 
 ## Documentation and roadmap
 
