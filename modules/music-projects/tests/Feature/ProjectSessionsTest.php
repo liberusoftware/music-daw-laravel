@@ -21,6 +21,7 @@ use Liberu\Music\Projects\Events\SessionSaved;
 use Liberu\Music\Projects\Exceptions\RevisionConflict;
 use Liberu\Music\Projects\MusicProjectsServiceProvider;
 use Liberu\Music\Projects\Services\ProjectSessions;
+use Liberu\Music\Projects\Services\SessionMetadata;
 use Liberu\Music\Projects\Support\GateProjectAccess;
 use Liberu\Music\Projects\Support\UnavailableMedia;
 
@@ -335,4 +336,49 @@ it('revalidates referenced media for preview and confirmation without requiring 
     $revoked->shouldReceive('authorized')->andReturn(false);
     app()->instance(MediaAccess::class, $revoked);
     expect(fn () => app(ProjectSessions::class)->import($this->actor, 'studio', $this->projectId, $manifest, 'confirm'))->toThrow(AuthorizationException::class);
+});
+
+it('browses lightweight session metadata and paginates history without loading documents', function () {
+    app(Gate::class)->define('music.projects.list', fn ($actor, $workspace) => $actor->id === 1 && $workspace === 'studio');
+    $this->sessions->save($this->actor, ($this->command)());
+    $this->sessions->save($this->actor, ($this->command)(1, 'draft', true));
+    $template = (string) Str::uuid();
+    $this->sessions->save($this->actor, new SaveSession('studio', $template, 'Template', SessionDocument::empty(), 0, 'template', template: true));
+    $metadata = app(SessionMetadata::class);
+    $page = $metadata->browse($this->actor, 'studio', 1);
+    expect($page->items[0]['project_id'])->toBe($template)->and($page->nextCursor)->not->toBeNull()
+        ->and($page->items[0])->not->toHaveKey('document');
+    $next = $metadata->browse($this->actor, 'studio', 1, $page->nextCursor);
+    expect($next->items[0]['version'])->toBe(2)->and($next->items[0]['autosave'])->toBeTrue()->and($next->nextCursor)->toBeNull();
+    expect($metadata->browse($this->actor, 'studio', templates: true)->items[0]['template'])->toBeTrue()
+        ->and($metadata->browse($this->actor, 'studio', templates: false)->items)->toHaveCount(1);
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+    $history = $metadata->history($this->actor, 'studio', $this->projectId, 1);
+    $queries = DB::getQueryLog();
+    DB::disableQueryLog();
+    expect($history->items[0]['version'])->toBe(2)->and($history->nextCursor)->toBe(2)
+        ->and($queries)->toHaveCount(2)->and(strtolower($queries[1]['query']))->not->toContain('document', 'select *', 'offset');
+    $last = $metadata->history($this->actor, 'studio', $this->projectId, 1, $history->nextCursor);
+    expect($last->items[0]['version'])->toBe(1)->and($last->nextCursor)->toBeNull()
+        ->and($metadata->history($this->actor, 'studio', $this->projectId, 1, 1)->items)->toBe([]);
+});
+
+it('authorizes metadata per workspace and every selected project without leaking a denied page', function () {
+    app(Gate::class)->define('music.projects.list', fn () => true);
+    $this->sessions->save($this->actor, ($this->command)());
+    $metadata = app(SessionMetadata::class);
+    expect(fn () => $metadata->history($this->actor, 'empty', $this->projectId))->toThrow(RecordNotFoundException::class)
+        ->and(fn () => $metadata->history(new GenericUser(['id' => 2]), 'studio', $this->projectId))->toThrow(AuthorizationException::class);
+    app(Gate::class)->define('music.projects.read', fn () => false);
+    expect(fn () => $metadata->browse($this->actor, 'studio'))->toThrow(AuthorizationException::class);
+    app(Gate::class)->define('music.projects.list', fn () => false);
+    expect(fn () => $metadata->browse($this->actor, 'studio'))->toThrow(AuthorizationException::class);
+});
+
+it('rejects unbounded metadata pages and invalid history cursors', function () {
+    app(Gate::class)->define('music.projects.list', fn () => true);
+    $metadata = app(SessionMetadata::class);
+    expect(fn () => $metadata->browse($this->actor, 'studio', 101))->toThrow(ValidationException::class)
+        ->and(fn () => $metadata->history($this->actor, 'studio', $this->projectId, before: 0))->toThrow(ValidationException::class);
 });
