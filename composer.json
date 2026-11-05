@@ -293,6 +293,13 @@
         },
         {
             "type": "path",
+            "url": "modules/tenancy",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
             "url": "modules/*",
             "options": {
                 "symlink": false,

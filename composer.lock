@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "77be72ff39845becda17293bb2b6c9f2",
+    "content-hash": "ea2b25bdb23733465ac7a44fed3217e3",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -7439,17 +7439,11 @@
         },
         {
             "name": "liberusoftware/tenancy",
-            "version": "1.0.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/liberusoftware/module-tenancy.git",
-                "reference": "634fcb3bdf9eb4625d37442dc2e388ec476dd041"
-            },
+            "version": "1.0.1",
             "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/liberusoftware/module-tenancy/zipball/634fcb3bdf9eb4625d37442dc2e388ec476dd041",
-                "reference": "634fcb3bdf9eb4625d37442dc2e388ec476dd041",
-                "shasum": ""
+                "type": "path",
+                "url": "modules/tenancy",
+                "reference": "f3a7c5cc0f9c1b08a56e9e8a9146e619559b8c46"
             },
             "require": {
                 "filament/filament": "^5.0",
@@ -7465,13 +7459,13 @@
             },
             "type": "liberu-module",
             "extra": {
-                "liberu": {
-                    "name": "tenancy"
-                },
                 "laravel": {
                     "providers": [
                         "Liberu\\Foundation\\Tenancy\\TenancyServiceProvider"
                     ]
+                },
+                "liberu": {
+                    "name": "tenancy"
                 }
             },
             "autoload": {
@@ -7479,16 +7473,24 @@
                     "Liberu\\Foundation\\Tenancy\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "autoload-dev": {
+                "psr-4": {
+                    "Liberu\\Foundation\\Tenancy\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "phpunit --no-configuration --bootstrap vendor/autoload.php tests"
+                ]
+            },
             "license": [
                 "MIT"
             ],
             "description": "Shared Filament and Jetstream team tenancy with scoped runtime context and Eloquent isolation.",
-            "support": {
-                "issues": "https://github.com/liberusoftware/module-tenancy/issues",
-                "source": "https://github.com/liberusoftware/module-tenancy/tree/v1.0.0"
-            },
-            "time": "2026-11-02T14:07:14+00:00"
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
         },
         {
             "name": "liberusoftware/theme-base",

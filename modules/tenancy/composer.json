@@ -38,5 +38,10 @@
   },
   "scripts": {
     "test": "phpunit --no-configuration --bootstrap vendor/autoload.php tests"
+  },
+  "config": {
+    "allow-plugins": {
+      "pestphp/pest-plugin": true
+    }
   }
 }
