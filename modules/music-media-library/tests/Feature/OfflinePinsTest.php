@@ -17,6 +17,7 @@ use Liberu\Music\MediaLibrary\Commands\RetainAssets;
 use Liberu\Music\MediaLibrary\Commands\SaveOfflinePin;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Events\OfflinePinSaved;
+use Liberu\Music\MediaLibrary\Exceptions\OfflinePinVersionConflict;
 use Liberu\Music\MediaLibrary\Exceptions\UploadConflict;
 use Liberu\Music\MediaLibrary\Services\MediaRetention;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
@@ -121,7 +122,7 @@ it('preserves session, pack and other device pins when one device releases its a
 it('rejects stale versions and conflicting command replay without changing the current pin', function () {
     $id = ($this->publish)();
     $this->pins->save($this->actor, new SaveOfflinePin('studio', $this->pinId, [$id], 0, 'first'));
-    expect(fn () => $this->pins->save($this->actor, new SaveOfflinePin('studio', $this->pinId, [], 0, 'stale')))->toThrow(UploadConflict::class, 'changed');
+    expect(fn () => $this->pins->save($this->actor, new SaveOfflinePin('studio', $this->pinId, [], 0, 'stale')))->toThrow(OfflinePinVersionConflict::class, 'changed');
     expect(fn () => $this->pins->save($this->actor, new SaveOfflinePin('studio', $this->pinId, [], 1, 'first')))->toThrow(UploadConflict::class, 'command key');
     expect($this->pins->get($this->actor, 'studio', $this->pinId)->version)->toBe(1)
         ->and(DB::table('music_media_retention')->count())->toBe(1);

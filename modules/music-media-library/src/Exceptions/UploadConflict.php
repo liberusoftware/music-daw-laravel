@@ -6,4 +6,4 @@ namespace Liberu\Music\MediaLibrary\Exceptions;
 
 use RuntimeException;
 
-final class UploadConflict extends RuntimeException {}
+class UploadConflict extends RuntimeException {}

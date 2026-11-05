@@ -16,6 +16,7 @@ use Liberu\Music\MediaLibrary\Commands\SaveOfflinePin;
 use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\Data\OfflinePin;
 use Liberu\Music\MediaLibrary\Events\OfflinePinSaved;
+use Liberu\Music\MediaLibrary\Exceptions\OfflinePinVersionConflict;
 use Liberu\Music\MediaLibrary\Exceptions\UploadConflict;
 
 final readonly class OfflinePins
@@ -47,7 +48,7 @@ final readonly class OfflinePins
                 return $pin;
             }
             if ((int) $current->version !== $command->expectedVersion) {
-                throw new UploadConflict('The offline pin changed; reload it before saving.');
+                throw new OfflinePinVersionConflict('The offline pin changed; reload it before saving.');
             }
             if ($command->expiresAt !== null && CarbonImmutable::parse($command->expiresAt)->lessThanOrEqualTo(CarbonImmutable::now('UTC'))) {
                 throw ValidationException::withMessages(['expires' => 'A new offline pin lease must expire in the future.']);

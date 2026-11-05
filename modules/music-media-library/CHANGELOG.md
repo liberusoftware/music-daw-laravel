@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a typed offline pin version conflict while preserving UploadConflict parent compatibility.
+
 - Distinguish conflicting pack idempotency keys from stale revisions through the existing typed metadata command conflict.
 
 - Add private integrity-verified download snapshots with live domain and foundation transfer approval.
