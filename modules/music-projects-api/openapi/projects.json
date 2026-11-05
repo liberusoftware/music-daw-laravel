@@ -1270,7 +1270,7 @@
             }
           },
           "409": {
-            "description": "Idempotency key reused for another command; use a new key for changed content.",
+            "description": "Command identity or immutable template-type conflict. Problem type distinguishes idempotency-conflict from template-conflict. Preserve the existing template type or use a new command key for different content.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1510,7 +1510,7 @@
             }
           },
           "409": {
-            "description": "Idempotency key reused for another command; use a new key for changed content.",
+            "description": "Command identity or immutable template-type conflict. Problem type distinguishes idempotency-conflict from template-conflict. Preserve the existing template type or use a new command key for different content.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1749,7 +1749,7 @@
             }
           },
           "409": {
-            "description": "Idempotency key reused for another command; use a new key for changed content.",
+            "description": "Command identity or immutable template-type conflict. Problem type distinguishes idempotency-conflict from template-conflict. Preserve the existing template type or use a new command key for different content.",
             "content": {
               "application/problem+json": {
                 "schema": {

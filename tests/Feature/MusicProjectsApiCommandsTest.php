@@ -58,6 +58,8 @@ it('saves recovers and imports API sessions with actual verified media and trans
     $this->postJson($base.'/checkpoints', $payload, $headers(0, 'create'))->assertCreated()->assertJsonPath('data.version', 1);
     $this->postJson($base.'/checkpoints', $payload, $headers(1, 'stale'))->assertStatus(412);
     $this->postJson($base.'/checkpoints', array_replace($payload, ['title' => 'Changed']), $headers(0, 'create'))->assertConflict();
+    $this->postJson($base.'/checkpoints', $payload + ['template' => true], $headers(3, 'change-type'))->assertConflict()
+        ->assertJsonPath('type', 'https://docs.liberusoftware.com/problems/music-projects-template-conflict');
     expect(DB::table('music_project_revisions')->count())->toBe(4)
         ->and(DB::table('music_media_retention')->where('asset_id', $assetId)->count())->toBe(4)
         ->and(app(MediaRetention::class)->isProtected($actor, 'studio', $assetId))->toBeTrue();

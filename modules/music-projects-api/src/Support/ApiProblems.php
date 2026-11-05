@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use JsonException;
 use Liberu\Music\Projects\Exceptions\IdempotencyConflict;
+use Liberu\Music\Projects\Exceptions\ProjectTypeConflict;
 use Liberu\Music\Projects\Exceptions\RevisionConflict;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -26,7 +27,7 @@ final class ApiProblems
             return null;
         }
         $status = match (true) {
-            $exception instanceof IdempotencyConflict => 409,
+            $exception instanceof IdempotencyConflict, $exception instanceof ProjectTypeConflict => 409,
             $exception instanceof RevisionConflict => 412,
             $exception instanceof AuthenticationException => 401,
             $exception instanceof AuthorizationException => 403,
@@ -47,12 +48,17 @@ final class ApiProblems
         $requestId = $request->attributes->get('music.request_id', (string) Str::uuid());
 
         return response()->json([
-            'type' => 'https://docs.liberusoftware.com/problems/music-projects-'.$status,
+            'type' => 'https://docs.liberusoftware.com/problems/music-projects-'.match (true) {
+                $exception instanceof IdempotencyConflict => 'idempotency-conflict',
+                $exception instanceof ProjectTypeConflict => 'template-conflict',
+                default => $status,
+            },
             'title' => Response::$statusTexts[$status], 'status' => $status,
-            'detail' => match ($status) {
-                409 => 'Use a new idempotency key for a different command.',
-                412 => 'Reload the current revision and reconcile changes before retrying.',
-                428 => 'Supply the quoted expected revision in the If-Match header.',
+            'detail' => match (true) {
+                $exception instanceof ProjectTypeConflict => 'Keep the existing template type or import into a new session.',
+                $exception instanceof IdempotencyConflict => 'Use a new idempotency key for a different command.',
+                $status === 412 => 'Reload the current revision and reconcile changes before retrying.',
+                $status === 428 => 'Supply the quoted expected revision in the If-Match header.',
                 default => 'The Music Projects request could not be completed.',
             }, 'instance' => $request->getPathInfo(),
             'request_id' => $requestId, 'errors' => $errors,

@@ -147,3 +147,12 @@ it('binds command fingerprints to the actor and supports template checkpoint fla
     $this->postJson($this->base.'/checkpoints', $payload, ($this->headers)(0, 'template'))->assertConflict();
     expect(DB::table('music_project_revisions')->count())->toBe(1);
 });
+
+it('distinguishes immutable template state conflicts from current revision preconditions', function () {
+    $this->postJson($this->base.'/checkpoints', $this->payload + ['template' => true], ($this->headers)(0, 'template'))->assertCreated();
+    $this->postJson($this->base.'/checkpoints', $this->payload, ($this->headers)(1, 'change-type'))->assertConflict()
+        ->assertJsonPath('type', 'https://docs.liberusoftware.com/problems/music-projects-template-conflict');
+    $this->postJson($this->base.'/checkpoints', array_replace($this->payload, ['title' => 'Changed', 'template' => true]), ($this->headers)(0, 'template'))->assertConflict()
+        ->assertJsonPath('type', 'https://docs.liberusoftware.com/problems/music-projects-idempotency-conflict');
+    $this->postJson($this->base.'/checkpoints', $this->payload + ['template' => true], ($this->headers)(1, 'update'))->assertCreated()->assertJsonPath('data.version', 2);
+});
