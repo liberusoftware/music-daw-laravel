@@ -12,6 +12,8 @@ use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\Contracts\PackDistributionPolicy;
 use Liberu\Music\MediaLibrary\Contracts\UploadBudgetPolicy;
 use Liberu\Music\MediaLibrary\Contracts\ZipArchiveFactory;
+use Liberu\Music\MediaLibrary\Services\AssetGarbageCollection;
+use Liberu\Music\MediaLibrary\Services\AssetLifecycle;
 use Liberu\Music\MediaLibrary\Services\AssetWaveforms;
 use Liberu\Music\MediaLibrary\Services\MediaCatalog;
 use Liberu\Music\MediaLibrary\Services\MediaPacks;
@@ -36,7 +38,7 @@ final class MusicMediaLibraryServiceProvider extends ServiceProvider
         $this->app->bindIf(ZipArchiveFactory::class, NativeZipArchiveFactory::class);
         $this->app->bindIf(UploadBudgetPolicy::class, ConfiguredUploadBudget::class);
         $this->app->when([ScopedMediaAccess::class, WaveformProcessing::class])->needs(UserProvider::class)->give(fn () => $this->app->make('auth')->createUserProvider(config('auth.guards.'.config('auth.defaults.guard').'.provider')));
-        $this->app->when([MediaUploads::class, AssetWaveforms::class, MediaCatalog::class, QuarantineCleanup::class, MediaPacks::class, PackArchives::class])->needs(Filesystem::class)->give(fn () => $this->app->make('filesystem')->disk(config('music-media.disk')));
+        $this->app->when([AssetLifecycle::class, AssetGarbageCollection::class, MediaUploads::class, AssetWaveforms::class, MediaCatalog::class, QuarantineCleanup::class, MediaPacks::class, PackArchives::class])->needs(Filesystem::class)->give(fn () => $this->app->make('filesystem')->disk(config('music-media.disk')));
         $this->app->when(PackArchives::class)->needs('$maxAudioBytes')->give(fn () => config('music-media.archive_max_audio_bytes'));
     }
 

@@ -6768,7 +6768,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library",
-                "reference": "eb2cae3cd8b6536d072a06a1d21dbbaf96e47db2"
+                "reference": "7278c0b9f59cc065335e32190c3321a9e7d2078c"
             },
             "require": {
                 "ext-zip": "*",
@@ -6819,7 +6819,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Private verified Music audio, reviewed packs, upload budgets, queued cached waveforms and retention.",
+            "description": "Verified Music audio, reviewed packs, upload budgets, queued waveforms and recoverable reference-safe asset cleanup.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

@@ -21,6 +21,7 @@ use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
 use Liberu\Music\MediaLibrary\Exceptions\UploadConflict;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Services\AssetWaveforms;
+use Liberu\Music\MediaLibrary\Services\ContentLocks;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
 use Liberu\Music\MediaLibrary\Services\UploadBudgets;
 use Liberu\Music\MediaLibrary\Services\WaveformIndexer;
@@ -160,7 +161,7 @@ it('cancels an unpublished upload idempotently without deleting content or expos
 
 it('fails closed when scanning is absent, rejected or unavailable and permits later retry', function () {
     ($this->receive)();
-    $withoutScanner = new MediaUploads(DB::connection(), $this->disk, app(MediaAuthorizer::class), app(WaveInspector::class), app(Dispatcher::class), app(UploadBudgets::class));
+    $withoutScanner = new MediaUploads(DB::connection(), $this->disk, app(MediaAuthorizer::class), app(WaveInspector::class), app(Dispatcher::class), app(UploadBudgets::class), app(ContentLocks::class));
     expect(fn () => $withoutScanner->complete($this->actor, 'studio', $this->id))->toThrow(InvalidAudio::class, 'quarantined');
     $attempt = 0;
     $this->scanner->shouldReceive('clean')->times(3)->andReturnUsing(function () use (&$attempt) {
@@ -208,7 +209,7 @@ it('detects missing, truncated or displaced chunks without publishing a revision
 it('does not mark a chunk received when object storage fails', function () {
     $store = Mockery::mock(Filesystem::class);
     $store->shouldReceive('put')->once()->andReturn(false);
-    $uploads = new MediaUploads(DB::connection(), $store, app(MediaAuthorizer::class), app(WaveInspector::class), app(Dispatcher::class), app(UploadBudgets::class), $this->scanner);
+    $uploads = new MediaUploads(DB::connection(), $store, app(MediaAuthorizer::class), app(WaveInspector::class), app(Dispatcher::class), app(UploadBudgets::class), app(ContentLocks::class), $this->scanner);
     $uploads->start($this->actor, ($this->command)());
     expect(fn () => $uploads->append($this->actor, 'studio', $this->id, 0, $this->bytes))->toThrow(RuntimeException::class, 'chunk could not');
     expect($uploads->status($this->actor, 'studio', $this->id)->receivedBytes)->toBe(0)
@@ -219,11 +220,11 @@ it('does not publish an asset when private storage cannot read or save the verif
     ($this->receive)();
     $store = Mockery::mock($this->disk);
     $store->shouldReceive('readStream')->once()->andReturn(false);
-    $uploads = new MediaUploads(DB::connection(), $store, app(MediaAuthorizer::class), app(WaveInspector::class), app(Dispatcher::class), app(UploadBudgets::class), $this->scanner);
+    $uploads = new MediaUploads(DB::connection(), $store, app(MediaAuthorizer::class), app(WaveInspector::class), app(Dispatcher::class), app(UploadBudgets::class), app(ContentLocks::class), $this->scanner);
     expect(fn () => $uploads->complete($this->actor, 'studio', $this->id))->toThrow(InvalidAudio::class, 'unreadable');
     $store = Mockery::mock($this->disk);
     $store->shouldReceive('put')->withArgs(fn ($key, $stream, $options) => str_starts_with($key, 'music/assets/'))->once()->andReturn(false);
-    $uploads = new MediaUploads(DB::connection(), $store, app(MediaAuthorizer::class), app(WaveInspector::class), app(Dispatcher::class), app(UploadBudgets::class), $this->scanner);
+    $uploads = new MediaUploads(DB::connection(), $store, app(MediaAuthorizer::class), app(WaveInspector::class), app(Dispatcher::class), app(UploadBudgets::class), app(ContentLocks::class), $this->scanner);
     expect(fn () => $uploads->complete($this->actor, 'studio', $this->id))->toThrow(RuntimeException::class, 'asset could not');
     expect($this->uploads->status($this->actor, 'studio', $this->id)->status)->toBe('uploading')->and($this->events)->toBe([]);
 });
@@ -289,7 +290,7 @@ it('restores a lost receiving chunk on matching replay and reports failed recove
     $this->disk->delete($key);
     $store = Mockery::mock($this->disk);
     $store->shouldReceive('put')->once()->andReturn(false);
-    $uploads = new MediaUploads(DB::connection(), $store, app(MediaAuthorizer::class), app(WaveInspector::class), app(Dispatcher::class), app(UploadBudgets::class), $this->scanner);
+    $uploads = new MediaUploads(DB::connection(), $store, app(MediaAuthorizer::class), app(WaveInspector::class), app(Dispatcher::class), app(UploadBudgets::class), app(ContentLocks::class), $this->scanner);
     expect(fn () => $uploads->append($this->actor, 'studio', $this->id, 0, $this->bytes))->toThrow(RuntimeException::class, 'restored');
     $this->uploads->append($this->actor, 'studio', $this->id, 0, $this->bytes);
     expect($this->disk->get($key))->toBe($this->bytes)

@@ -57,11 +57,23 @@ final readonly class UploadBudgets
     /** @param list<string> $uploadIds */
     public function releaseCancelledInTransaction(Authenticatable $actor, string $workspaceId, array $uploadIds, ConnectionInterface $transaction): int
     {
+        return $this->releaseInTransaction($actor, $workspaceId, $uploadIds, 'cancelled', $transaction);
+    }
+
+    /** @param list<string> $uploadIds */
+    public function releaseCollectedInTransaction(Authenticatable $actor, string $workspaceId, array $uploadIds, ConnectionInterface $transaction): int
+    {
+        return $this->releaseInTransaction($actor, $workspaceId, $uploadIds, 'collected', $transaction);
+    }
+
+    /** @param list<string> $uploadIds */
+    private function releaseInTransaction(Authenticatable $actor, string $workspaceId, array $uploadIds, string $status, ConnectionInterface $transaction): int
+    {
         $this->requireTransaction($transaction);
         $rows = $this->database->table('music_media_upload_reservations as reservations')
             ->join('music_media_uploads as uploads', 'uploads.id', '=', 'reservations.upload_id')
             ->where('reservations.workspace_id', $workspaceId)->where('uploads.workspace_id', $workspaceId)
-            ->where('uploads.status', 'cancelled')->whereIn('uploads.id', $uploadIds)->where('reservations.reserved_bytes', '>', 0)
+            ->where('uploads.status', $status)->whereIn('uploads.id', $uploadIds)->where('reservations.reserved_bytes', '>', 0)
             ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('music_media_upload_chunks as chunks')->whereColumn('chunks.upload_id', 'uploads.id'))
             ->orderBy('uploads.id')->lockForUpdate()->get(['reservations.upload_id', 'reservations.reserved_bytes']);
         $released = (int) $rows->sum('reserved_bytes');

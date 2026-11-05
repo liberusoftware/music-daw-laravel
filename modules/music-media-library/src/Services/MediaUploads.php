@@ -33,6 +33,7 @@ final readonly class MediaUploads
         private WaveInspector $inspector,
         private Dispatcher $events,
         private UploadBudgets $budgets,
+        private ContentLocks $contentLocks,
         private ?MalwareScanner $scanner = null,
     ) {}
 
@@ -89,8 +90,8 @@ final readonly class MediaUploads
             $started = [];
             foreach ($ordered as $command) {
                 $progress = $this->start($actor, $command);
-                if ($progress->status === 'cancelled') {
-                    throw new UploadConflict('Cancelled upload identities cannot be accepted in a new batch.');
+                if (! in_array($progress->status, ['uploading', 'ready'], true)) {
+                    throw new UploadConflict('Terminal upload identities cannot be accepted in a new batch.');
                 }
                 $started[$command->uploadId] = $progress;
             }
@@ -168,6 +169,7 @@ final readonly class MediaUploads
 
         return $this->database->transaction(function () use ($actor, $workspaceId, $uploadId, $restore): ReadyAsset {
             $upload = $this->upload($workspaceId, $uploadId)->lockForUpdate()->firstOrFail();
+            $this->contentLocks->acquire($workspaceId, $upload->sha256, $this->database);
             $target = null;
             $fingerprint = null;
             if ($restore !== null) {
@@ -272,8 +274,8 @@ final readonly class MediaUploads
 
         return $this->database->transaction(function () use ($actor, $workspaceId, $uploadId): UploadProgress {
             $upload = $this->upload($workspaceId, $uploadId)->lockForUpdate()->firstOrFail();
-            if ($upload->status === 'ready') {
-                throw new UploadConflict('Published assets require retention checks and cannot be cancelled.');
+            if (! in_array($upload->status, ['uploading', 'cancelled'], true)) {
+                throw new UploadConflict('Published assets require lifecycle operations and cannot be cancelled.');
             }
             if ($upload->status === 'cancelled') {
                 $this->budgets->releaseCancelledInTransaction($actor, $workspaceId, [$uploadId], $this->database);

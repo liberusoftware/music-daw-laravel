@@ -19,6 +19,7 @@ use Liberu\Music\MediaLibrary\Events\AssetRestored;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
 use Liberu\Music\MediaLibrary\Exceptions\UploadConflict;
 use Liberu\Music\MediaLibrary\Services\AssetWaveforms;
+use Liberu\Music\MediaLibrary\Services\ContentLocks;
 use Liberu\Music\MediaLibrary\Services\MediaCatalog;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
 use Liberu\Music\MediaLibrary\Services\UploadBudgets;
@@ -139,7 +140,7 @@ it('leaves the existing object intact when scanning or staged publication fails'
     $clean->shouldReceive('clean')->andReturn(true);
     $store = Mockery::mock($this->disk);
     $store->shouldReceive('move')->once()->andReturn(false);
-    $uploads = new MediaUploads(DB::connection(), $store, app(MediaAuthorizer::class), app(WaveInspector::class), app(Dispatcher::class), app(UploadBudgets::class), $clean);
+    $uploads = new MediaUploads(DB::connection(), $store, app(MediaAuthorizer::class), app(WaveInspector::class), app(Dispatcher::class), app(UploadBudgets::class), app(ContentLocks::class), $clean);
     expect(fn () => $uploads->restore($this->actor, $command))->toThrow(RuntimeException::class, 'could not be published');
     expect($this->disk->get($this->key))->toBe($this->bytes)
         ->and(DB::table('music_media_restore_commands')->count())->toBe(0)->and($this->events)->toBe([])
@@ -188,7 +189,7 @@ it('verifies staged bytes before replacing the existing content-addressed object
     $store = Mockery::mock($this->disk);
     $store->shouldReceive('put')->once()->andReturnUsing(fn ($key, $stream, $options) => $this->disk->put($key, str_repeat('x', strlen($this->bytes)), $options));
     $store->shouldNotReceive('move');
-    $uploads = new MediaUploads(DB::connection(), $store, app(MediaAuthorizer::class), app(WaveInspector::class), app(Dispatcher::class), app(UploadBudgets::class), $this->scanner);
+    $uploads = new MediaUploads(DB::connection(), $store, app(MediaAuthorizer::class), app(WaveInspector::class), app(Dispatcher::class), app(UploadBudgets::class), app(ContentLocks::class), $this->scanner);
     expect(fn () => $uploads->restore($this->actor, new RestoreAsset('studio', $this->originalId, $source, 'repair')))->toThrow(InvalidAudio::class, 'integrity');
     expect($this->disk->get($this->key))->toBe($this->bytes)->and($this->events)->toBe([])
         ->and(array_filter($this->disk->allFiles(), fn ($path) => str_contains($path, '.pending-')))->toBe([]);

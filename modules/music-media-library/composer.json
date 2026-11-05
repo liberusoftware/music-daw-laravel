@@ -1,6 +1,6 @@
 {
   "name": "liberusoftware/music-media-library",
-  "description": "Private verified Music audio, reviewed packs, upload budgets, queued cached waveforms and retention.",
+  "description": "Verified Music audio, reviewed packs, upload budgets, queued waveforms and recoverable reference-safe asset cleanup.",
   "type": "liberu-module",
   "license": "MIT",
   "version": "0.1.0",
