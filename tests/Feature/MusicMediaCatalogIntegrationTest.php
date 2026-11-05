@@ -16,6 +16,7 @@ use Liberu\Music\MediaLibrary\Services\MediaCatalog;
 use Liberu\Music\MediaLibrary\Services\MediaPacks;
 use Liberu\Music\MediaLibrary\Services\MediaRetention;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
+use Liberu\Music\MediaLibrary\Services\PackArchives;
 
 it('finds tagged verified audio through the host foundation registry without widening workspace access', function () {
     $this->app->register(MusicMediaLibraryServiceProvider::class);
@@ -28,7 +29,7 @@ it('finds tagged verified audio through the host foundation registry without wid
     }
     Gate::define('music.media.pack_distribute', fn ($user, $pack) => $user->getKey() === $actor->getKey() && $pack->workspaceId === 'studio' && $pack->rights['license'] === 'CC-BY-4.0');
     $scanner = Mockery::mock(MalwareScanner::class);
-    $scanner->shouldReceive('clean')->once()->andReturn(true);
+    $scanner->shouldReceive('clean')->twice()->andReturn(true);
     app()->instance(MalwareScanner::class, $scanner);
     $format = pack('vvVVvv', 1, 1, 48000, 96000, 2, 16);
     $chunks = 'fmt '.pack('V', 16).$format.'data'.pack('V', 4).pack('v*', 0, 16384);
@@ -59,6 +60,18 @@ it('finds tagged verified audio through the host foundation registry without wid
     $manifest = $packs->export($actor, 'studio', $packId);
     $copy = $packs->import($actor, 'studio', (string) Str::uuid(), $manifest, [$id => $id], 'import');
     expect($copy->assets)->toBe($pack->assets)->and($copy->rights)->toBe($rights);
+    $archive = tmpfile();
+    try {
+        $archives = app(PackArchives::class);
+        $receipt = $archives->exportTo($actor, 'studio', $packId, $archive);
+        rewind($archive);
+        $destinationId = (string) Str::uuid();
+        $unpacked = $archives->importFrom($actor, 'studio', (string) Str::uuid(), $archive, [$id => $destinationId], 'receive-archive');
+        expect($receipt->mediaObjects)->toBe(1)->and($unpacked->assets[0]['reference']['id'])->toBe($destinationId)
+            ->and($unpacked->rights)->toBe($rights)->and($uploads->get($actor, 'studio', $destinationId)->metadata['sha256'])->toBe(hash('sha256', $bytes));
+    } finally {
+        fclose($archive);
+    }
     Gate::define('music.media.distribute', fn () => false);
     expect(fn () => $packs->export($actor, 'studio', $packId))->toThrow(AuthorizationException::class);
     expect(fn () => $packs->get(User::factory()->create(), 'studio', $packId))->toThrow(AuthorizationException::class);

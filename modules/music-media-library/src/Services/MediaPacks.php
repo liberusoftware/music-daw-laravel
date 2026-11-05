@@ -122,7 +122,7 @@ final readonly class MediaPacks
             'checksum' => hash('sha256', json_encode($pack, JSON_THROW_ON_ERROR))], JSON_THROW_ON_ERROR);
     }
 
-    public function import(Authenticatable $actor, string $workspaceId, string $packId, string $manifest, array $assetMap, string $commandKey): MediaPack
+    public function previewImport(Authenticatable $actor, string $workspaceId, string $packId, string $manifest, array $assetMap): MediaPack
     {
         $this->authorizeTransfer($actor, $workspaceId, $packId, 'import');
         if (strlen($manifest) > self::MAX_DOCUMENT_BYTES * 2) {
@@ -145,6 +145,13 @@ final readonly class MediaPacks
         if ($keys !== $sourceIds) {
             throw ValidationException::withMessages(['map' => 'Map exactly the source asset identities to verified destination assets.']);
         }
+
+        return $source;
+    }
+
+    public function import(Authenticatable $actor, string $workspaceId, string $packId, string $manifest, array $assetMap, string $commandKey): MediaPack
+    {
+        $source = $this->previewImport($actor, $workspaceId, $packId, $manifest, $assetMap);
         $assets = $this->assets($actor, $workspaceId, array_values($assetMap));
         // Index by the public reference ID; destination storage keys never enter
         // the portable document or an import command.

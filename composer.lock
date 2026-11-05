@@ -6768,9 +6768,10 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library",
-                "reference": "186f3d1bc284cc3696b6751d11f9533260564c75"
+                "reference": "59aeb5310ccacc54fc3e00a23561cbca375bec4d"
             },
             "require": {
+                "ext-zip": "*",
                 "illuminate/auth": "^13.38",
                 "illuminate/database": "^13.38",
                 "illuminate/events": "^13.38",
@@ -6781,7 +6782,8 @@
                 "liberusoftware/files-media": "^1.4",
                 "liberusoftware/import-export": "^1.4",
                 "liberusoftware/search": "^1.5",
-                "php": "^8.5"
+                "php": "^8.5",
+                "php-64bit": "^8.5"
             },
             "require-dev": {
                 "liberusoftware/package-testbench": "^1.8",
@@ -6814,7 +6816,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Private Music audio assets, versioned packs with rights provenance, offline pins, retention and resumable quarantine cleanup.",
+            "description": "Private Music audio assets, reviewed pack manifests and verified ZIP transport, offline pins, retention and resumable cleanup.",
             "transport-options": {
                 "symlink": true,
                 "relative": true
