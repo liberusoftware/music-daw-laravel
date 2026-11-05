@@ -7,3 +7,4 @@
 - Add verified per-channel waveform previews with bounded output and explicit sample-frame positions.
 - Add scoped foundation media authorization through the configured principal provider.
 - Add retry-safe versioned media names/tags and authorized foundation catalog search.
+- Restore missing/corrupt media from verified replacement uploads while preserving references; verify staging before publication.

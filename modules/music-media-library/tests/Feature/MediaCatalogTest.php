@@ -7,6 +7,7 @@ use Illuminate\Contracts\Auth\Access\Gate;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\RecordNotFoundException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -180,7 +181,8 @@ it('integrates the foundation registry using the authenticated principal and val
 
 it('backfills Unicode search names when upgrading existing uploaded assets', function () {
     $asset = ($this->publish)('ÉLECTRIC old recording');
-    $this->artisan('migrate:rollback', ['--path' => realpath(__DIR__.'/../../database/migrations'), '--realpath' => true, '--step' => 1])->assertSuccessful();
+    $this->artisan('migrate:rollback', ['--path' => realpath(__DIR__.'/../../database/migrations'), '--realpath' => true, '--step' => 2])->assertSuccessful();
+    expect(Schema::hasColumn('music_media_uploads', 'search_name'))->toBeFalse();
     expect(DB::table('music_media_uploads')->where('id', $asset->id)->value('name'))->toBe('ÉLECTRIC old recording');
     $this->artisan('migrate', ['--path' => realpath(__DIR__.'/../../database/migrations'), '--realpath' => true])->assertSuccessful();
     expect(DB::table('music_media_uploads')->where('id', $asset->id)->value('search_name'))->toBe('électric old recording')

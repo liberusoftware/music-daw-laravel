@@ -12,11 +12,13 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
+use Liberu\Music\MediaLibrary\Commands\RestoreAsset;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\Data\ReadyAsset;
 use Liberu\Music\MediaLibrary\Data\UploadProgress;
 use Liberu\Music\MediaLibrary\Events\AssetReady;
+use Liberu\Music\MediaLibrary\Events\AssetRestored;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
 use Liberu\Music\MediaLibrary\Exceptions\UploadConflict;
 use RuntimeException;
@@ -107,16 +109,48 @@ final readonly class MediaUploads
 
     public function complete(Authenticatable $actor, string $workspaceId, string $uploadId): ReadyAsset
     {
+        return $this->completeUpload($actor, $workspaceId, $uploadId);
+    }
+
+    public function restore(Authenticatable $actor, RestoreAsset $command): ReadyAsset
+    {
+        $this->access->authorize($actor, $command->workspaceId, $command->assetId, 'restore');
+        $this->access->authorize($actor, $command->workspaceId, $command->assetId, 'read');
+
+        return $this->completeUpload($actor, $command->workspaceId, $command->replacementUploadId, $command);
+    }
+
+    private function completeUpload(Authenticatable $actor, string $workspaceId, string $uploadId, ?RestoreAsset $restore = null): ReadyAsset
+    {
         $this->access->authorize($actor, $workspaceId, $uploadId, 'upload');
 
-        return $this->database->transaction(function () use ($actor, $workspaceId, $uploadId): ReadyAsset {
+        return $this->database->transaction(function () use ($actor, $workspaceId, $uploadId, $restore): ReadyAsset {
             $upload = $this->upload($workspaceId, $uploadId)->lockForUpdate()->firstOrFail();
-            if ($upload->status === 'ready') {
+            $target = null;
+            $fingerprint = null;
+            if ($restore !== null) {
+                $target = $this->upload($workspaceId, $restore->assetId)->where('status', 'ready')->lockForUpdate()->firstOrFail();
+                $fingerprint = hash('sha256', json_encode([(string) $actor->getAuthIdentifier(), $restore], JSON_THROW_ON_ERROR));
+                $previous = $this->database->table('music_media_restore_commands')->where('asset_id', $target->id)->where('command_hash', hash('sha256', $restore->commandKey))->first();
+                if ($previous !== null) {
+                    if (! hash_equals($previous->fingerprint, $fingerprint)) {
+                        throw new UploadConflict('The restore command key already belongs to another operation.');
+                    }
+                    $this->assertStored($target->blob_key, $target->sha256, (int) $target->total_bytes);
+
+                    return $this->asset($target);
+                }
+                if (! hash_equals($target->sha256, $upload->sha256) || (int) $target->total_bytes !== (int) $upload->total_bytes) {
+                    throw new UploadConflict('Replacement audio must match the original asset checksum and size.');
+                }
+            }
+            $wasReady = $upload->status === 'ready';
+            if ($wasReady && $restore === null) {
                 $this->assertPresent($upload);
 
                 return $this->asset($upload);
             }
-            if ($upload->status !== 'uploading' || (int) $upload->received_bytes !== (int) $upload->total_bytes) {
+            if (! in_array($upload->status, ['uploading', 'ready'], true) || (int) $upload->received_bytes !== (int) $upload->total_bytes) {
                 throw new UploadConflict('All upload bytes must be received before verification.');
             }
             $stream = tmpfile() ?: throw new RuntimeException('Temporary audio storage is unavailable.');
@@ -148,29 +182,31 @@ final readonly class MediaUploads
                     throw new InvalidAudio('The verified upload checksum or size differs from its declaration.');
                 }
                 $key = 'music/assets/'.hash('sha256', $workspaceId).'/'.$audio->sha256;
-                if (! $this->objects->exists($key)) {
-                    rewind($stream);
-                    if (! $this->objects->put($key, $stream, ['visibility' => 'private'])) {
-                        throw new RuntimeException('The verified asset could not be stored.');
-                    }
+                if ($target !== null && $target->blob_key !== $key) {
+                    throw new UploadConflict('The stored asset location differs from its content address.');
                 }
-                $blob = $this->readObject($key);
-                try {
-                    $hash = hash_init('sha256');
-                    $length = hash_update_stream($hash, $blob, $audio->bytes + 1);
-                    if ($length !== $audio->bytes || ! hash_equals($audio->sha256, hash_final($hash))) {
-                        throw new InvalidAudio('The stored asset failed its integrity check.');
-                    }
-                } finally {
-                    fclose($blob);
+                if ($restore !== null || ! $this->objects->exists($key)) {
+                    $this->publishBlob($key, $stream, $audio->sha256, $audio->bytes);
                 }
-                $duplicate = $this->database->table('music_media_uploads')->where('workspace_id', $workspaceId)
-                    ->where('sha256', $audio->sha256)->where('status', 'ready')->where('id', '!=', $uploadId)->orderBy('id')->value('id');
-                $metadata = ['schema_version' => 1] + $audio->jsonSerialize();
-                $this->upload($workspaceId, $uploadId)->update(['status' => 'ready', 'blob_key' => $key,
-                    'metadata' => json_encode($metadata, JSON_THROW_ON_ERROR), 'duplicate_of' => $duplicate, 'updated_at' => now()]);
-                $asset = new ReadyAsset($uploadId, $workspaceId, $upload->name, $metadata, json_decode($upload->provenance, true, flags: JSON_THROW_ON_ERROR), $duplicate);
-                $this->events->dispatch(new AssetReady($asset, (string) $actor->getAuthIdentifier()));
+                $this->assertStored($key, $audio->sha256, $audio->bytes);
+                if (! $wasReady) {
+                    $duplicate = $this->database->table('music_media_uploads')->where('workspace_id', $workspaceId)
+                        ->where('sha256', $audio->sha256)->where('status', 'ready')->where('id', '!=', $uploadId)->orderBy('id')->value('id');
+                    $metadata = ['schema_version' => 1] + $audio->jsonSerialize();
+                    $this->upload($workspaceId, $uploadId)->update(['status' => 'ready', 'blob_key' => $key,
+                        'metadata' => json_encode($metadata, JSON_THROW_ON_ERROR), 'duplicate_of' => $duplicate, 'updated_at' => now()]);
+                    $asset = new ReadyAsset($uploadId, $workspaceId, $upload->name, $metadata, json_decode($upload->provenance, true, flags: JSON_THROW_ON_ERROR), $duplicate);
+                    $this->events->dispatch(new AssetReady($asset, (string) $actor->getAuthIdentifier()));
+                } else {
+                    $asset = $this->asset($upload);
+                }
+                if ($restore !== null) {
+                    $asset = $this->asset($target);
+                    $this->database->table('music_media_restore_commands')->insert(['asset_id' => $target->id, 'source_upload_id' => $uploadId,
+                        'command_hash' => hash('sha256', $restore->commandKey), 'fingerprint' => $fingerprint,
+                        'actor_id' => (string) $actor->getAuthIdentifier(), 'created_at' => now()]);
+                    $this->events->dispatch(new AssetRestored($asset, $uploadId, (string) $actor->getAuthIdentifier()));
+                }
 
                 return $asset;
             } finally {
@@ -223,6 +259,40 @@ final readonly class MediaUploads
     {
         if (! $this->objects->exists($row->blob_key)) {
             throw new InvalidAudio('The verified media file is missing; restore it before opening this asset.');
+        }
+    }
+
+    /** @param resource $stream */
+    private function publishBlob(string $key, mixed $stream, string $checksum, int $bytes): void
+    {
+        $staged = $key.'.pending-'.Str::uuid();
+        rewind($stream);
+        try {
+            if (! $this->objects->put($staged, $stream, ['visibility' => 'private'])) {
+                throw new RuntimeException('The verified asset could not be stored.');
+            }
+            $this->assertStored($staged, $checksum, $bytes);
+            // Supported stores must replace a complete object atomically. The local
+            // driver renames the verified staging file on the same filesystem.
+            if (! $this->objects->move($staged, $key)) {
+                throw new RuntimeException('The verified asset could not be published.');
+            }
+        } finally {
+            $this->objects->delete($staged);
+        }
+    }
+
+    private function assertStored(string $key, string $checksum, int $bytes): void
+    {
+        $blob = $this->readObject($key);
+        try {
+            $hash = hash_init('sha256');
+            $length = hash_update_stream($hash, $blob, $bytes + 1);
+            if ($length !== $bytes || ! hash_equals($checksum, hash_final($hash))) {
+                throw new InvalidAudio('The stored asset failed its integrity check.');
+            }
+        } finally {
+            fclose($blob);
         }
     }
 

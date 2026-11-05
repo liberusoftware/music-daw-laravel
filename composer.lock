@@ -6768,7 +6768,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library",
-                "reference": "a91ed8a5d4bc659ee5e1820367ac9db3c814e0b9"
+                "reference": "63ba5a5bbd94575faf5ca4fcd5ab7abc6c7f9146"
             },
             "require": {
                 "illuminate/auth": "^13.38",
@@ -6814,7 +6814,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Private Music audio uploads, verified waveforms and authorized tagged media catalogs.",
+            "description": "Private Music audio uploads, recoverable verified assets, waveforms and authorized catalogs.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

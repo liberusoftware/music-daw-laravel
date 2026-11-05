@@ -1,6 +1,6 @@
 {
   "name": "liberusoftware/music-media-library",
-  "description": "Private Music audio uploads, verified waveforms and authorized tagged media catalogs.",
+  "description": "Private Music audio uploads, recoverable verified assets, waveforms and authorized catalogs.",
   "type": "liberu-module",
   "license": "MIT",
   "version": "0.1.0",

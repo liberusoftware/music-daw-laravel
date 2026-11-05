@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Foundation\Files\Contracts\MediaAccess;
+use Liberu\Music\MediaLibrary\Commands\RestoreAsset;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
@@ -82,4 +83,46 @@ it('saves, recovers and reopens portable sessions using actual verified uploaded
     Gate::define('music.media.read', fn ($user, $workspace) => $user->getKey() === $actor->getKey() && $workspace === 'studio');
     $disk->delete(DB::table('music_media_uploads')->where('id', $mediaId)->value('blob_key'));
     expect(fn () => $sessions->get($actor, 'studio', $projectId))->toThrow(InvalidAudio::class, 'missing');
+});
+
+it('reopens a saved session after authorized restoration without rewriting its revision', function () {
+    $this->app->register(MusicMediaLibraryServiceProvider::class);
+    (new MusicModuleIntegrationProvider($this->app))->boot();
+    $this->artisan('migrate', ['--path' => base_path('modules/music-media-library/database/migrations'), '--realpath' => true])->assertSuccessful();
+    config()->set('music-media.disk', 'session-restore-test');
+    $disk = Storage::fake('session-restore-test');
+    $actor = User::factory()->create();
+    foreach (['music.media.upload', 'music.media.read', 'music.media.restore', 'music.projects.read', 'music.projects.write'] as $ability) {
+        Gate::define($ability, fn ($user, $workspace) => $user->getKey() === $actor->getKey() && $workspace === 'studio');
+    }
+    $scanner = Mockery::mock(MalwareScanner::class);
+    $scanner->shouldReceive('clean')->twice()->andReturn(true);
+    app()->instance(MalwareScanner::class, $scanner);
+    $format = pack('vvVVvv', 1, 1, 48000, 96000, 2, 16);
+    $chunks = 'fmt '.pack('V', 16).$format.'data'.pack('V', 4).pack('v*', 0, 16384);
+    $bytes = 'RIFF'.pack('V', strlen($chunks) + 4).'WAVE'.$chunks;
+    $uploads = app(MediaUploads::class);
+    $receive = function () use ($actor, $bytes, $uploads): string {
+        $id = (string) Str::uuid();
+        $uploads->start($actor, new StartUpload('studio', $id, 'Recording', strlen($bytes), hash('sha256', $bytes)));
+        $uploads->append($actor, 'studio', $id, 0, $bytes);
+
+        return $id;
+    };
+    $originalId = $receive();
+    $asset = $uploads->complete($actor, 'studio', $originalId);
+    $input = SessionDocument::empty()->jsonSerialize();
+    $input['assets'] = [$asset->reference()];
+    $input['tracks'] = [['id' => (string) Str::uuid(), 'name' => 'Keep this take', 'kind' => 'audio', 'parent_id' => null, 'media_ids' => [$originalId]]];
+    $projectId = (string) Str::uuid();
+    $sessions = app(ProjectSessions::class);
+    $saved = $sessions->save($actor, new SaveSession('studio', $projectId, 'Before restore', SessionDocument::fromArray($input), 0, 'create'));
+    $storedDocument = DB::table('music_project_revisions')->where('project_id', $projectId)->value('document');
+    $disk->delete(DB::table('music_media_uploads')->where('id', $originalId)->value('blob_key'));
+    expect(fn () => $sessions->get($actor, 'studio', $projectId))->toThrow(InvalidAudio::class);
+    $restored = $uploads->restore($actor, new RestoreAsset('studio', $originalId, $receive(), 'repair'));
+    expect($restored->id)->toBe($originalId)
+        ->and($sessions->get($actor, 'studio', $projectId)->jsonSerialize())->toBe($saved->jsonSerialize())
+        ->and(DB::table('music_project_revisions')->where('project_id', $projectId)->value('document'))->toBe($storedDocument)
+        ->and(DB::table('music_project_revisions')->where('project_id', $projectId)->count())->toBe(1);
 });
