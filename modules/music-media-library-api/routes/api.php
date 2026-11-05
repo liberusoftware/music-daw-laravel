@@ -6,6 +6,7 @@ use Liberu\Music\MediaLibraryApi\Http\Controllers\AssetTasksController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\DownloadsController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\MediaController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\MetadataController;
+use Liberu\Music\MediaLibraryApi\Http\Controllers\OfflinePinsController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\PacksController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\UploadsController;
 use Liberu\Music\MediaLibraryApi\Http\Middleware\ApiBoundary;
@@ -14,6 +15,8 @@ use Liberu\Music\MediaLibraryApi\Http\Middleware\RequireMedia;
 Route::prefix('api/v1/music-media/workspaces/{workspace}')->where(['workspace' => '[A-Za-z0-9_-]{1,128}'])
     ->name('music.media.api.')->middleware([ApiBoundary::class, 'auth:sanctum', RequireMedia::class, 'throttle:60,1'])->group(function () {
         Route::middleware(CheckAbilities::class.':music.media.read')->group(function () {
+            Route::get('/offline-pins/{pin}', [OfflinePinsController::class, 'show'])->whereUuid('pin')->middleware(CheckAbilities::class.':music.media.pins.read')->name('pin');
+            Route::put('/offline-pins/{pin}', [OfflinePinsController::class, 'save'])->whereUuid('pin')->middleware(CheckAbilities::class.':music.media.pins.write')->name('pin-save');
             Route::get('/packs/{pack}', [PacksController::class, 'show'])->whereUuid('pack')->middleware(CheckAbilities::class.':music.media.packs.read')->name('pack');
             Route::put('/packs/{pack}', [PacksController::class, 'save'])->whereUuid('pack')->middleware(CheckAbilities::class.':music.media.packs.write')->name('pack-save');
             Route::get('/packs/{pack}/history', [PacksController::class, 'history'])->whereUuid('pack')->middleware(CheckAbilities::class.':music.media.packs.read')->name('pack-history');

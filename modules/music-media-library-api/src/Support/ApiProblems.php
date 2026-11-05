@@ -15,6 +15,7 @@ use JsonException;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
 use Liberu\Music\MediaLibrary\Exceptions\MetadataCommandConflict;
 use Liberu\Music\MediaLibrary\Exceptions\MetadataConflict;
+use Liberu\Music\MediaLibrary\Exceptions\OfflinePinVersionConflict;
 use Liberu\Music\MediaLibrary\Exceptions\UploadBudgetExceeded;
 use Liberu\Music\MediaLibrary\Exceptions\UploadConflict;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,6 +31,7 @@ final class ApiProblems
         }
         $status = match (true) {
             $exception instanceof AuthenticationException => 401, $exception instanceof AuthorizationException => 403,
+            $exception instanceof OfflinePinVersionConflict => 412,
             $exception instanceof RecordNotFoundException => 404, $exception instanceof UploadConflict, $exception instanceof MetadataCommandConflict => 409,
             $exception instanceof MetadataConflict => 412, $exception instanceof UploadBudgetExceeded => 429,
             $exception instanceof ValidationException, $exception instanceof InvalidAudio => 422,
@@ -42,6 +44,7 @@ final class ApiProblems
                     'upload' => $request->route('asset') === null ? 'upload_id' : 'replacement_upload_id',
                     'replacement' => 'replacement_upload_id',
                     'map' => 'asset_map',
+                    'expires' => 'expires_at',
                     default => $field,
                 };
                 foreach ($messages as $message) {

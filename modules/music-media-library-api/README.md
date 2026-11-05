@@ -2,7 +2,7 @@
 
 Optional Laravel HTTP adapter for `liberusoftware/music-media-library`. The module is disabled by default. It invokes the core's public commands, query DTOs and policies; it owns no audio, identity or domain persistence.
 
-This is an **incomplete module increment**, not the full Media Library API release. The OpenAPI 3.1 contract in [openapi/media.json](openapi/media.json) covers verified metadata, keyset browsing, conditional metadata edits, authenticated resumable upload intake, queued verification/restoration/waveform tasks, short-lived scoped downloads and versioned rights/provenance pack manifests. Offline pins, lifecycle HTTP operations and queued audio archive transfers remain to be implemented. Capability discovery advertises these limitations. The complete core/API/Filament/Livewire DAW scope remains open.
+This is an **incomplete module increment**, not the full Media Library API release. The OpenAPI 3.1 contract in [openapi/media.json](openapi/media.json) covers verified metadata, keyset browsing, conditional metadata edits, authenticated resumable upload intake, queued verification/restoration/waveform tasks, short-lived scoped downloads and versioned rights/provenance pack manifests. Lifecycle HTTP operations and queued audio archive transfers remain to be implemented. Capability discovery advertises these limitations. The complete core/API/Filament/Livewire DAW scope remains open.
 
 ## Installation and host configuration
 
@@ -117,3 +117,11 @@ All pack routes require `music.media.read`, current Core policies, and the opera
 Core rechecks workspace/asset authorization and retains every saved revision atomically. Same-command replay returns its original revision; reusing the key for different content returns 409, and stale versions return 412. Reads/exports fail closed for revoked asset access, missing audio or provenance drift. Import/export require the existing foundation `TransferAuthorizer` for `music-media-pack` / `import` or `export`; missing integration denies the operation. Pack read/write/import/export gates remain separate from token abilities. Preview does not certify licensing or authorize a later commit.
 
 Save bodies are limited to 64 KiB; preview/import JSON bodies to 8 MiB, with Core's bounded portable document checks also applied. A manifest contains verified references and rights metadata, never audio, storage keys or credentials. These synchronous bounded metadata routes do not implement queued ZIP/audio archive transfer. Use the asset upload and private download contracts for audio bytes.
+
+### Actor-owned offline pins
+
+`GET offline-pins/{pin}` requires `music.media.read` and `music.media.pins.read`. `PUT offline-pins/{pin}` requires `music.media.read` and `music.media.pins.write`, an Idempotency-Key and one strong quoted If-Match version (zero creates). Both enforce the live Core pin policy and asset read policies; saves and replays also require retention authorization. Pin identity is owned by the authenticated actor inside its workspace.
+
+Send `asset_ids` as a distinct list of at most 10,000 verified UUIDs and optional nullable `expires_at` in exact UTC `YYYY-MM-DDTHH:mm:ssZ` format. The JSON body limit is 512 KiB. Omit expiry or send null for no lease expiry; a new non-null lease must be in the future. Replace the list to update a pin, use a new key/current revision to renew, or send an empty list to release this pin's references. Other pins, packs and session revisions stay protected independently.
+
+Responses include the Core pin receipt and quoted version ETag. Conflicting key reuse returns 409; a stale version returns 412. Replays return the original receipt without renewing an expired lease or reverting later changes; GET returns current pin state. Expired leases remain readable metadata but no longer protect audio through that pin. Downloading, verifying and durably saving bytes on a device is a separate client responsibility; server pin success is not proof of local availability or a completed offline synchronization workflow.

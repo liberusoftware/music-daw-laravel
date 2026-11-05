@@ -420,3 +420,69 @@ describe('reviewed pack manifests', function () {
         $this->withHeader('Content-Length', '0')->postJson($this->packUrl.'/import-preview', ['oversized' => str_repeat('x', 8388609)])->assertStatus(413);
     });
 });
+
+describe('actor-owned offline pins', function () {
+    beforeEach(function () {
+        app(Gate::class)->define('music.media.pin', fn ($actor, $workspace) => in_array($workspace, ['studio', 'other']) && $this->denied !== 'pin');
+        Sanctum::actingAs($this->actor, ['music.media.read', 'music.media.upload', 'music.media.pins.read', 'music.media.pins.write']);
+        $this->asset = ($this->publish)();
+        $this->pinUrl = $this->base.'/offline-pins/'.Str::uuid();
+        $this->savePin = fn (array $ids, int $version = 0, string $key = 'create', ?string $expires = null) => $this->withHeaders(['If-Match' => '"'.$version.'"', 'Idempotency-Key' => $key])->putJson($this->pinUrl, ['asset_ids' => $ids, 'expires_at' => $expires]);
+    });
+
+    it('creates renews releases and replays pin receipts without reverting current retention', function () {
+        ($this->savePin)([$this->asset])->assertSuccessful()->assertHeader('ETag', '"1"');
+        expect(app(MediaRetention::class)->isProtected($this->actor, 'studio', $this->asset))->toBeTrue();
+        ($this->savePin)([], 1, 'release')->assertSuccessful()->assertHeader('ETag', '"2"');
+        expect(app(MediaRetention::class)->isProtected($this->actor, 'studio', $this->asset))->toBeFalse();
+        ($this->savePin)([$this->asset])->assertSuccessful()->assertHeader('ETag', '"1"');
+        $this->getJson($this->pinUrl)->assertSuccessful()->assertHeader('ETag', '"2"')->assertJsonCount(0, 'data.asset_ids');
+        expect(app(MediaRetention::class)->isProtected($this->actor, 'studio', $this->asset))->toBeFalse();
+        ($this->savePin)([$this->asset], 0, 'stale')->assertStatus(412);
+        ($this->savePin)([], 0, 'create')->assertConflict();
+        $expires = now()->addMinute()->format('Y-m-d\TH:i:s\Z');
+        ($this->savePin)([$this->asset], 2, 'lease', $expires)->assertSuccessful()->assertJsonPath('data.expires_at', $expires);
+        $this->travel(61)->seconds();
+        expect(app(MediaRetention::class)->isProtected($this->actor, 'studio', $this->asset))->toBeFalse();
+        ($this->savePin)([$this->asset], 2, 'lease', $expires)->assertSuccessful()->assertHeader('ETag', '"3"');
+        expect(app(MediaRetention::class)->isProtected($this->actor, 'studio', $this->asset))->toBeFalse();
+        ($this->savePin)([$this->asset], 3, 'new-expired', $expires)->assertUnprocessable()->assertJsonPath('errors.0.pointer', '/expires_at');
+        ($this->savePin)([$this->asset], 3, 'renew', now()->addHour()->format('Y-m-d\TH:i:s\Z'))->assertSuccessful()->assertHeader('ETag', '"4"');
+        expect(app(MediaRetention::class)->isProtected($this->actor, 'studio', $this->asset))->toBeTrue();
+        $this->travelBack();
+    });
+
+    it('enforces ownership workspace token scopes and live pin asset and retention policies', function () {
+        ($this->savePin)([$this->asset])->assertSuccessful();
+        $this->getJson(str_replace('/studio/', '/other/', $this->pinUrl))->assertNotFound();
+        Sanctum::actingAs((new Actor())->forceFill(['id' => 8]), ['music.media.read', 'music.media.pins.read', 'music.media.pins.write']);
+        $this->getJson($this->pinUrl)->assertNotFound();
+        ($this->savePin)([], 1, 'foreign')->assertNotFound();
+        Sanctum::actingAs($this->actor, ['music.media.read']);
+        $this->getJson($this->pinUrl)->assertForbidden();
+        ($this->savePin)([], 1, 'scope')->assertForbidden();
+        Sanctum::actingAs($this->actor, ['music.media.read', 'music.media.pins.read', 'music.media.pins.write']);
+        $this->denied = 'pin';
+        $this->getJson($this->pinUrl)->assertForbidden();
+        ($this->savePin)([], 1, 'pin-denied')->assertForbidden();
+        $this->denied = 'read';
+        $this->getJson($this->pinUrl)->assertForbidden();
+        ($this->savePin)([], 1, 'read-denied')->assertForbidden();
+        $this->denied = 'retain';
+        ($this->savePin)([], 1, 'retain-denied')->assertForbidden();
+        ($this->savePin)([$this->asset])->assertForbidden();
+    });
+
+    it('rejects missing unverified malformed and oversized pin writes without partial state', function () {
+        $this->flushHeaders()->putJson($this->pinUrl, ['asset_ids' => []])->assertStatus(428);
+        ($this->savePin)([(string) Str::uuid()])->assertNotFound();
+        $this->getJson($this->pinUrl)->assertNotFound();
+        ($this->savePin)([$this->asset, $this->asset])->assertUnprocessable();
+        ($this->savePin)([$this->asset], 0, 'bad-date', '2026-11-05T10:00:00+01:00')->assertUnprocessable();
+        ($this->savePin)([$this->asset], 0, 'past', now()->subMinute()->format('Y-m-d\TH:i:s\Z'))->assertUnprocessable();
+        $this->putJson($this->pinUrl, ['asset_ids' => [], 'oversized' => str_repeat('x', 524289)])->assertStatus(413);
+        $this->getJson($this->pinUrl)->assertNotFound();
+        DB::table('music_media_uploads')->where('id', $this->asset)->update(['status' => 'uploading']);
+        ($this->savePin)([$this->asset])->assertNotFound();
+    });
+});

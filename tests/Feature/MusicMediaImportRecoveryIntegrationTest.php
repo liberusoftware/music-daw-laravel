@@ -23,12 +23,12 @@ it('imports indexes tags finds and restores retained audio through the host HTTP
     config()->set('music-media.disk', 'host-media-import-recovery');
     $disk = Storage::fake('host-media-import-recovery');
     $actor = User::factory()->create();
-    foreach (['upload', 'read', 'list', 'annotate', 'restore', 'retain', 'download', 'pack_read', 'pack_write', 'pack_import', 'pack_export', 'distribute'] as $operation) {
+    foreach (['upload', 'read', 'list', 'annotate', 'restore', 'retain', 'download', 'pack_read', 'pack_write', 'pack_import', 'pack_export', 'distribute', 'pin'] as $operation) {
         Gate::define('music.media.'.$operation, fn ($user, $workspace) => $user->getKey() === $actor->getKey() && $workspace === 'studio');
     }
     app()->instance(MalwareScanner::class, Mockery::mock(MalwareScanner::class)->shouldReceive('clean')->twice()->andReturnTrue()->getMock());
     Bus::fake();
-    $token = $actor->createToken('music-import', ['music.media.read', 'music.media.upload', 'music.media.edit', 'music.media.process', 'music.media.restore', 'music.media.download', 'music.media.packs.read', 'music.media.packs.write', 'music.media.packs.import', 'music.media.packs.export'])->plainTextToken;
+    $token = $actor->createToken('music-import', ['music.media.read', 'music.media.upload', 'music.media.edit', 'music.media.process', 'music.media.restore', 'music.media.download', 'music.media.packs.read', 'music.media.packs.write', 'music.media.packs.import', 'music.media.packs.export', 'music.media.pins.read', 'music.media.pins.write'])->plainTextToken;
     $this->withToken($token);
     $format = pack('vvVVvv', 1, 1, 48000, 96000, 2, 16);
     $chunks = 'fmt '.pack('V', 16).$format.'data'.pack('V', 4).pack('v*', 0, 16384);
@@ -79,9 +79,15 @@ it('imports indexes tags finds and restores retained audio through the host HTTP
     $this->postJson($destination.'/import-preview', $import)->assertSuccessful();
     $this->withHeader('Idempotency-Key', 'pack-import')->putJson($destination.'/import', $import)->assertSuccessful();
     $this->getJson($destination)->assertSuccessful()->assertJsonPath('data.assets.0.reference.id', $assetId);
+    $pinUrl = $base.'/offline-pins/'.Str::uuid();
+    $this->withHeaders(['Idempotency-Key' => 'pin-create', 'If-Match' => '"0"'])->putJson($pinUrl, ['asset_ids' => [$assetId]])->assertSuccessful()->assertHeader('ETag', '"1"');
+    $this->getJson($pinUrl)->assertSuccessful()->assertJsonPath('data.asset_ids.0', $assetId);
+    $this->withHeaders(['Idempotency-Key' => 'pin-release', 'If-Match' => '"1"'])->putJson($pinUrl, ['asset_ids' => []])->assertSuccessful()->assertHeader('ETag', '"2"');
+    expect(app(MediaRetention::class)->isProtected($actor, 'studio', $assetId))->toBeTrue();
     $actor->tokens()->delete();
     app('auth')->forgetGuards();
     $this->getJson($base.'/assets/'.$assetId)->assertUnauthorized();
     $this->get($url)->assertUnauthorized();
     $this->getJson($packUrl)->assertUnauthorized();
+    $this->getJson($pinUrl)->assertUnauthorized();
 });

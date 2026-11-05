@@ -3484,6 +3484,246 @@
           }
         }
       }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/offline-pins/{pin}": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "pin",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "mediaOfflinePinRead",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Read the current actor-owned offline pin set",
+        "description": "Requires music.media.read and music.media.pins.read (GET) or music.media.pins.write (PUT), live pin and per-asset read policies, and retain authorization for writes/replays. PUT requires Idempotency-Key and one strong quoted If-Match revision (zero creates). Empty asset_ids releases this pin only. New leases must be future UTC values. Replays return their original receipt without renewing or reverting later saves; GET returns current state. This server retention record does not prove local download completion or implement offline synchronization.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OfflinePin"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong quoted metadata version; copy unchanged into If-Match for an edit.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      },
+      "put": {
+        "operationId": "mediaOfflinePinSave",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Create replace renew or release an actor-owned offline pin set",
+        "description": "Requires music.media.read and music.media.pins.read (GET) or music.media.pins.write (PUT), live pin and per-asset read policies, and retain authorization for writes/replays. PUT requires Idempotency-Key and one strong quoted If-Match revision (zero creates). Empty asset_ids releases this pin only. New leases must be future UTC values. Replays return their original receipt without renewing or reverting later saves; GET returns current state. This server retention record does not prove local download completion or implement offline synchronization.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OfflinePin"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong quoted metadata version; copy unchanged into If-Match for an edit.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveOfflinePin"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "One strong quoted revision. Use \"0\" for creation/import; updates use the last observed ETag.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\"(0|[1-9][0-9]{0,18})\"$"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -4367,6 +4607,73 @@
           },
           "created_at": {
             "type": "string"
+          }
+        }
+      },
+      "OfflinePin": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "workspace_id",
+          "pin_id",
+          "version",
+          "asset_ids",
+          "expires_at"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "workspace_id": {
+            "type": "string"
+          },
+          "pin_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "asset_ids": {
+            "type": "array",
+            "maxItems": 10000,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "UTC lease time (YYYY-MM-DDTHH:mm:ssZ), or null for no expiry. Historical replay receipts may be expired."
+          }
+        }
+      },
+      "SaveOfflinePin": {
+        "type": "object",
+        "required": [
+          "asset_ids"
+        ],
+        "properties": {
+          "asset_ids": {
+            "type": "array",
+            "maxItems": 10000,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
           }
         }
       }

@@ -21,6 +21,7 @@ final class ApiBoundary
                 $binary => 4194304,
                 $request->routeIs('music.media.api.pack-import', 'music.media.api.pack-preview') => 8388608,
                 $request->routeIs('music.media.api.pack-save') => 65536,
+                $request->routeIs('music.media.api.pin-save') => 524288,
                 default => 8192,
             };
             abort_if((int) $request->header('Content-Length', '0') > $limit, 413);

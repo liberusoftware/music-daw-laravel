@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add actor-owned conditional offline pin read/save, lease renewal and release with replay-safe receipts and live retention policy checks.
+
 - Add conditional replay-safe rights/provenance pack saves, historical reads, paginated revision summaries and reviewed portable manifest export/preview/import.
 - Bound pack JSON intake and preserve distinct live distribution/foundation transfer authorization.
 
