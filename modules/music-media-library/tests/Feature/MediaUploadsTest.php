@@ -3,6 +3,7 @@
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Contracts\Auth\Access\Gate;
+use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\RecordNotFoundException;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
+use Liberu\Foundation\Files\Contracts\MediaAccess;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\Events\AssetReady;
@@ -23,6 +25,7 @@ use Liberu\Music\MediaLibrary\Services\MediaUploads;
 use Liberu\Music\MediaLibrary\Services\WaveformIndexer;
 use Liberu\Music\MediaLibrary\Services\WaveInspector;
 use Liberu\Music\MediaLibrary\Support\GateMediaAuthorizer;
+use Liberu\Music\MediaLibrary\Support\ScopedMediaAccess;
 
 function uploadAudioFixture(): string
 {
@@ -340,4 +343,29 @@ it('refuses previews from a changed published blob and always closes the source 
     expect(is_resource($stream))->toBeFalse();
     $this->disk->delete($key);
     expect(fn () => app(AssetWaveforms::class)->build($this->actor, 'studio', $this->id))->toThrow(InvalidAudio::class, 'missing');
+});
+
+it('authorizes foundation media reads through the configured principal provider without trusting an ambient login', function () {
+    ($this->receive)();
+    $users = Mockery::mock(UserProvider::class);
+    $users->shouldReceive('retrieveById')->with(7)->andReturn($this->actor);
+    $users->shouldReceive('retrieveById')->with('7')->andReturn($this->actor);
+    $users->shouldReceive('retrieveById')->with(99)->andReturn(null);
+    $users->shouldReceive('retrieveById')->with(8)->andReturn(new GenericUser(['id' => 8]));
+    $access = new ScopedMediaAccess(DB::connection(), $users, app(MediaAuthorizer::class));
+    $unconfigured = new ScopedMediaAccess(DB::connection(), null, app(MediaAuthorizer::class));
+    expect($unconfigured->authorized(7, $this->id, 'read'))->toBeFalse();
+    expect($access->authorized(null, $this->id, 'read'))->toBeFalse()
+        ->and($access->authorized(7, $this->id, 'delete'))->toBeFalse()
+        ->and($access->authorized(99, $this->id, 'read'))->toBeFalse()
+        ->and($access->authorized(7, $this->id, 'read'))->toBeFalse();
+    $this->uploads->complete($this->actor, 'studio', $this->id);
+    expect($access->authorized(7, $this->id, 'read'))->toBeTrue()
+        ->and($access->authorized('7', $this->id, 'read'))->toBeTrue()
+        ->and($access->authorized(8, $this->id, 'read'))->toBeFalse()
+        ->and($access->authorized(7, (string) Str::uuid(), 'read'))->toBeFalse();
+    app(Gate::class)->define('music.media.read', fn () => false);
+    expect($access->authorized(7, $this->id, 'read'))->toBeFalse();
+    expect(app(ScopedMediaAccess::class))->toBeInstanceOf(ScopedMediaAccess::class)
+        ->and(app()->bound(MediaAccess::class))->toBeFalse();
 });

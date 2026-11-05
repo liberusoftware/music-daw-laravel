@@ -208,7 +208,7 @@ final readonly class ProjectSessions
             if ($this->mediaAccess === null || ! $this->mediaAccess->authorized($actor->getAuthIdentifier(), $asset['id'], 'read')) {
                 throw new AuthorizationException('The referenced media is unavailable to this actor.');
             }
-            $verified = $this->media->resolve($workspaceId, $asset['id']);
+            $verified = $this->media->resolve($actor, $workspaceId, $asset['id']);
             foreach ($asset as $key => $value) {
                 if (! array_key_exists($key, $verified) || $verified[$key] !== $value) {
                     throw ValidationException::withMessages(['assets' => 'The referenced media has not been verified or its metadata differs.']);

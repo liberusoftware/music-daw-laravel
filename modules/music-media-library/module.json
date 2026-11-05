@@ -23,6 +23,7 @@
     "Verified audio metadata",
     "Resumable private uploads",
     "Verified asset publication",
-    "Bounded channel waveform indexing"
+    "Bounded channel waveform indexing",
+    "Scoped foundation media authorization"
   ]
 }

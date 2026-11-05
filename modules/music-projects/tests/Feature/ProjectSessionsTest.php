@@ -181,7 +181,7 @@ it('denies missing media authorization and validates authoritative workspace met
     $access->shouldReceive('authorized')->with(1, 'asset-1', 'read')->andReturn(true);
     app()->instance(MediaAccess::class, $access);
     $catalogue = Mockery::mock(VerifiedMedia::class);
-    $catalogue->shouldReceive('resolve')->with('studio', 'asset-1')->andReturn($asset);
+    $catalogue->shouldReceive('resolve')->with($this->actor, 'studio', 'asset-1')->andReturn($asset);
     app()->instance(VerifiedMedia::class, $catalogue);
     $sessions = app(ProjectSessions::class);
     $sessions->save($this->actor, $command);
@@ -207,7 +207,7 @@ it('denies missing media authorization and validates authoritative workspace met
 it('fails closed without a verified media owner and supplies replaceable authorization bindings', function () {
     expect(app(ProjectAccess::class))->toBeInstanceOf(GateProjectAccess::class)
         ->and(app(VerifiedMedia::class))->toBeInstanceOf(UnavailableMedia::class);
-    expect(fn () => app(VerifiedMedia::class)->resolve('studio', 'missing'))->toThrow(LogicException::class);
+    expect(fn () => app(VerifiedMedia::class)->resolve($this->actor, 'studio', 'missing'))->toThrow(LogicException::class);
     $replacement = Mockery::mock(ProjectAccess::class);
     app()->instance(ProjectAccess::class, $replacement);
     (new MusicProjectsServiceProvider(app()))->register();

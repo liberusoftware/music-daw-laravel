@@ -2,7 +2,7 @@
   "$schema": "https://schemas.liberu.dev/module/v1.json",
   "name": "music-projects",
   "display_name": "Music Projects",
-  "description": "Versioned Music session documents, revisions and autosave recovery.",
+  "description": "Actor-authorized Music session documents, revisions and autosave recovery.",
   "version": "0.1.0",
   "category": "product",
   "provider": "Liberu\\Music\\Projects\\MusicProjectsServiceProvider",
