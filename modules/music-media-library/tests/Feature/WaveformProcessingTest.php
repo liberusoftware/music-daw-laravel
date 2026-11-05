@@ -75,11 +75,11 @@ it('queues only after commit and returns authorized versioned task and cached re
     $job->handle($this->processing);
     expect($this->processing->get($this->actor, 'studio', $task->id)->status)->toBe('ready')
         ->and($this->processing->result($this->actor, 'studio', $task->id)->peaks)->toHaveCount(2)
-        ->and($this->events)->toHaveCount(1)->and($job->tries)->toBe(3)->and($job->timeout)->toBe(60)->and($job->backoff)->toBe([5, 30, 120]);
+        ->and($this->events)->toHaveCount(2)->and($job->tries)->toBe(3)->and($job->timeout)->toBe(60)->and($job->backoff)->toBe([5, 30, 120]);
     $job->handle($this->processing);
     $this->processing->request($this->actor, $command);
     Bus::assertDispatchedTimes(BuildWaveform::class, 1);
-    expect($this->events)->toHaveCount(1)->and(json_decode(json_encode($this->events[0]->task), true))->toBe([
+    expect($this->events)->toHaveCount(2)->and(json_decode(json_encode($this->events[1]->task), true))->toBe([
         'schema_version' => 1, 'id' => $task->id, 'workspace_id' => 'studio', 'asset_id' => $this->id, 'requested_sample_frames_per_peak' => 1, 'status' => 'ready',
     ]);
 });
@@ -102,7 +102,7 @@ it('replays queued and failed requests and recovers evicted previews without new
         ->and(json_encode($this->events[0]))->not->toContain('private');
     $this->processing->failed($command->taskId);
     $this->processing->failed((string) Str::uuid());
-    expect($this->events)->toHaveCount(1);
+    expect($this->events)->toHaveCount(2);
     $this->processing->request($this->actor, $command);
     $this->processing->process($command->taskId);
     $this->processing->failed($command->taskId);
@@ -189,6 +189,7 @@ it('preserves durable queued work across publication failure and permits retry',
 it('defers completion events and permits retry after the completion transaction rolls back', function () {
     $command = ($this->command)();
     $this->processing->request($this->actor, $command);
+    $this->events = [];
     DB::beginTransaction();
     $this->processing->process($command->taskId);
     expect($this->events)->toBe([]);

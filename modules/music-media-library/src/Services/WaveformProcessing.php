@@ -27,7 +27,7 @@ final readonly class WaveformProcessing
         $asset = $this->uploads->get($actor, $command->workspaceId, $command->assetId);
 
         return $this->database->transaction(function () use ($actor, $command, $asset): WaveformTask {
-            $this->database->table('music_media_waveform_tasks')->insertOrIgnore([
+            $inserted = $this->database->table('music_media_waveform_tasks')->insertOrIgnore([
                 'id' => $command->taskId, 'workspace_id' => $command->workspaceId, 'actor_id' => (string) $actor->getAuthIdentifier(),
                 'asset_id' => $command->assetId, 'source_sha256' => $asset->metadata['sha256'], 'frames_per_peak' => $command->framesPerPeak,
                 'status' => 'queued', 'created_at' => now(), 'updated_at' => now(),
@@ -37,8 +37,12 @@ final readonly class WaveformProcessing
                 throw new UploadConflict('This waveform task identifier belongs to another request.');
             }
             if ($row->status !== 'ready' || $this->waveforms->get($actor, $command->workspaceId, $command->assetId, $command->framesPerPeak) === null) {
+                $changed = $inserted === 1 || $row->status !== 'queued';
                 $this->database->table('music_media_waveform_tasks')->where('id', $row->id)->update(['status' => 'queued', 'updated_at' => now()]);
                 $row->status = 'queued';
+                if ($changed) {
+                    $this->events->dispatch(new WaveformTaskChanged($this->task($row)));
+                }
                 // A queue outage leaves a durable queued request. Replaying this
                 // command re-dispatches it without creating another task identity.
                 $this->database->afterCommit(fn () => $this->bus->dispatch(new BuildWaveform($row->id)));
