@@ -514,7 +514,7 @@
             "@php artisan key:generate --ansi"
         ],
         "test": "vendor/bin/pest",
-        "test:coverage": "vendor/bin/pest --coverage --min=100"
+        "test:coverage": "@php -d pcov.directory=. vendor/bin/pest --coverage --min=100"
     },
     "extra": {
         "laravel": {

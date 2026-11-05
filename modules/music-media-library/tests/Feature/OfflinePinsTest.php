@@ -230,7 +230,7 @@ it('validates identifiers, bounded lists, versions, command keys and explicit UT
 it('upgrades and reverses the lease schema while preserving existing permanent references', function () {
     $id = ($this->publish)();
     $this->retention->retain($this->actor, new RetainAssets('studio', 'session:1', [$id]));
-    $this->artisan('migrate:rollback', ['--path' => realpath(__DIR__.'/../../database/migrations'), '--realpath' => true, '--step' => 1])->assertSuccessful();
+    $this->artisan('migrate:rollback', ['--path' => realpath(__DIR__.'/../../database/migrations'), '--realpath' => true, '--step' => DB::table('migrations')->where('migration', '>=', '2026_11_05_160608_create_music_media_offline_pins')->count()])->assertSuccessful();
     expect(Schema::hasColumn('music_media_retention', 'expires_at'))->toBeFalse()
         ->and(DB::table('music_media_retention')->count())->toBe(1);
     $this->artisan('migrate', ['--path' => realpath(__DIR__.'/../../database/migrations'), '--realpath' => true])->assertSuccessful();

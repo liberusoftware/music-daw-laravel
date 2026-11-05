@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Foundation\Files\Contracts\MediaAccess;
+use Liberu\Music\MediaLibrary\Commands\CollectCancelledUploads;
 use Liberu\Music\MediaLibrary\Commands\RestoreAsset;
 use Liberu\Music\MediaLibrary\Commands\SaveOfflinePin;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
@@ -21,6 +22,8 @@ use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Services\MediaRetention;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
 use Liberu\Music\MediaLibrary\Services\OfflinePins;
+use Liberu\Music\MediaLibrary\Services\QuarantineCleanup;
+use Liberu\Music\Projects\Commands\BackfillSessionRetention;
 use Liberu\Music\Projects\Commands\SaveSession;
 use Liberu\Music\Projects\Contracts\VerifiedMedia;
 use Liberu\Music\Projects\Data\SessionDocument;
@@ -41,7 +44,7 @@ it('saves, recovers and reopens portable sessions using actual verified uploaded
     $disk = Storage::fake('music-session-integration');
     $actor = User::factory()->create();
     $other = User::factory()->create();
-    foreach (['music.projects.write', 'music.projects.read', 'music.media.upload', 'music.media.read', 'music.media.retain', 'music.media.pin'] as $ability) {
+    foreach (['music.projects.write', 'music.projects.read', 'music.projects.retain', 'music.media.upload', 'music.media.read', 'music.media.retain', 'music.media.pin', 'music.media.collect'] as $ability) {
         Gate::define($ability, fn ($user, $workspace) => $user->getKey() === $actor->getKey() && in_array($workspace, ['studio', 'other']));
     }
     $scanner = Mockery::mock(MalwareScanner::class);
@@ -91,6 +94,10 @@ it('saves, recovers and reopens portable sessions using actual verified uploaded
     expect($recovered->autosave)->toBeFalse()->and($recovered->version)->toBe(3)
         ->and($reopened->document->jsonSerialize())->toBe($document->jsonSerialize())
         ->and($sessions->get($actor, 'studio', $projectId)->document->assets())->toBe([$asset->reference()]);
+    DB::table('music_media_retention')->delete();
+    $backfill = $sessions->retainHistory($actor, new BackfillSessionRetention('studio'));
+    expect($backfill->complete())->toBeTrue()->and($backfill->processedRevisions)->toBe(4)
+        ->and(DB::table('music_media_retention')->count())->toBe(4);
     $offline = app(OfflinePins::class);
     $pinId = (string) Str::uuid();
     $pinCommand = new SaveOfflinePin('studio', $pinId, [$mediaId], 0, 'pin');
@@ -101,6 +108,18 @@ it('saves, recovers and reopens portable sessions using actual verified uploaded
     expect(DB::table('music_media_retention')->count())->toBe(4)
         ->and(app(MediaRetention::class)->isProtected($actor, 'studio', $mediaId))->toBeTrue()
         ->and($sessions->get($actor, 'studio', $projectId)->document->assets())->toBe([$asset->reference()]);
+    $cancelledId = (string) Str::uuid();
+    $uploads->start($actor, new StartUpload('studio', $cancelledId, 'Discarded take', strlen($bytes), hash('sha256', $bytes)));
+    $uploads->append($actor, 'studio', $cancelledId, 0, $bytes);
+    $uploads->cancel($actor, 'studio', $cancelledId);
+    $quarantine = DB::table('music_media_upload_chunks')->where('upload_id', $cancelledId)->value('object_key');
+    $this->travel(24)->hours();
+    $cleanup = app(QuarantineCleanup::class);
+    expect(fn () => $cleanup->collect($other, new CollectCancelledUploads('studio', dryRun: false)))->toThrow(AuthorizationException::class);
+    expect($cleanup->collect($actor, new CollectCancelledUploads('studio', dryRun: false))->chunkIds)->toHaveCount(1);
+    $disk->assertMissing($quarantine);
+    expect($sessions->get($actor, 'studio', $projectId)->jsonSerialize())->toBe($recovered->jsonSerialize())
+        ->and(app(MediaRetention::class)->isProtected($actor, 'studio', $mediaId))->toBeTrue();
     expect(fn () => $offline->get($other, 'studio', $pinId))->toThrow(AuthorizationException::class);
     expect(fn () => $sessions->save($other, $command))->toThrow(AuthorizationException::class);
     expect(fn () => $sessions->save($actor, new SaveSession('other', (string) Str::uuid(), 'Cross workspace', $document, 0, 'cross')))->toThrow(RecordNotFoundException::class);

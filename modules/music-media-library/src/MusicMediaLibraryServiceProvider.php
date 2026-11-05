@@ -13,6 +13,7 @@ use Liberu\Music\MediaLibrary\Services\AssetWaveforms;
 use Liberu\Music\MediaLibrary\Services\MediaCatalog;
 use Liberu\Music\MediaLibrary\Services\MediaSearchAdapter;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
+use Liberu\Music\MediaLibrary\Services\QuarantineCleanup;
 use Liberu\Music\MediaLibrary\Support\GateMediaAuthorizer;
 use Liberu\Music\MediaLibrary\Support\ScopedMediaAccess;
 
@@ -23,7 +24,7 @@ final class MusicMediaLibraryServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/music-media.php', 'music-media');
         $this->app->bindIf(MediaAuthorizer::class, GateMediaAuthorizer::class);
         $this->app->when(ScopedMediaAccess::class)->needs(UserProvider::class)->give(fn () => $this->app->make('auth')->createUserProvider(config('auth.guards.'.config('auth.defaults.guard').'.provider')));
-        $this->app->when([MediaUploads::class, AssetWaveforms::class, MediaCatalog::class])->needs(Filesystem::class)->give(fn () => $this->app->make('filesystem')->disk(config('music-media.disk')));
+        $this->app->when([MediaUploads::class, AssetWaveforms::class, MediaCatalog::class, QuarantineCleanup::class])->needs(Filesystem::class)->give(fn () => $this->app->make('filesystem')->disk(config('music-media.disk')));
     }
 
     public function boot(): void

@@ -1,6 +1,6 @@
 {
   "name": "liberusoftware/music-media-library",
-  "description": "Private Music audio uploads, verified assets, versioned offline pins, retention, waveforms and authorized catalogs.",
+  "description": "Private Music audio uploads, verified assets, offline pins, retention, resumable quarantine cleanup and authorized catalogs.",
   "type": "liberu-module",
   "license": "MIT",
   "version": "0.1.0",

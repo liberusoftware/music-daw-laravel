@@ -233,7 +233,10 @@ final readonly class MediaUploads
             if ($upload->status === 'ready') {
                 throw new UploadConflict('Published assets require retention checks and cannot be cancelled.');
             }
-            $this->upload($workspaceId, $uploadId)->update(['status' => 'cancelled', 'updated_at' => now()]);
+            if ($upload->status === 'cancelled') {
+                return $this->progress($upload);
+            }
+            $this->upload($workspaceId, $uploadId)->update(['status' => 'cancelled', 'cancelled_at' => now('UTC'), 'updated_at' => now()]);
             $upload->status = 'cancelled';
 
             return $this->progress($upload);
