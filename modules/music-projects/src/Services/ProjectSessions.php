@@ -14,12 +14,14 @@ use Illuminate\Validation\ValidationException;
 use Liberu\Foundation\Files\Contracts\MediaAccess;
 use Liberu\Music\Projects\Commands\SaveSession;
 use Liberu\Music\Projects\Contracts\ProjectAccess;
+use Liberu\Music\Projects\Contracts\SessionMediaRetention;
 use Liberu\Music\Projects\Contracts\VerifiedMedia;
 use Liberu\Music\Projects\Data\SessionDocument;
 use Liberu\Music\Projects\Data\SessionPage;
 use Liberu\Music\Projects\Data\SessionRevision;
 use Liberu\Music\Projects\Events\SessionSaved;
 use Liberu\Music\Projects\Exceptions\RevisionConflict;
+use LogicException;
 
 final readonly class ProjectSessions
 {
@@ -29,6 +31,7 @@ final readonly class ProjectSessions
         private VerifiedMedia $media,
         private Dispatcher $events,
         private ?MediaAccess $mediaAccess = null,
+        private ?SessionMediaRetention $retention = null,
     ) {}
 
     public function save(Authenticatable $actor, SaveSession $command): SessionRevision
@@ -60,7 +63,10 @@ final readonly class ProjectSessions
                     throw new RevisionConflict('The idempotency key was already used for a different command.');
                 }
 
-                return $this->revision($replay);
+                $revision = $this->revision($replay);
+                $this->retainMedia($actor, $revision);
+
+                return $revision;
             }
             if ((int) $project->version !== $command->expectedVersion || (bool) $project->template !== $command->template) {
                 throw new RevisionConflict('The session changed; reload it before saving.');
@@ -71,6 +77,7 @@ final readonly class ProjectSessions
             if ($updated !== 1) {
                 throw new RevisionConflict('The session changed during this save.');
             }
+            $this->retainMedia($actor, new SessionRevision($command->workspaceId, $command->projectId, $command->title, $version, $command->document, $command->autosave, $command->template));
             $this->database->table('music_project_revisions')->insert([
                 'project_id' => $command->projectId, 'workspace_id' => $command->workspaceId,
                 'title' => $command->title, 'version' => $version,
@@ -200,6 +207,18 @@ final readonly class ProjectSessions
         }
 
         return new SessionRevision($row->workspace_id, $row->project_id, $row->title, (int) $row->version, $document, (bool) $row->autosave, (bool) $row->template);
+    }
+
+    private function retainMedia(Authenticatable $actor, SessionRevision $revision): void
+    {
+        $ids = array_column($revision->document->assets(), 'id');
+        if ($ids === []) {
+            return;
+        }
+        if ($this->retention === null) {
+            throw new LogicException('A media retention owner must be enabled before saving audio references.');
+        }
+        $this->retention->retain($actor, $revision->workspaceId, $revision->projectId, $revision->version, $ids, $this->database);
     }
 
     private function verifyMedia(Authenticatable $actor, string $workspaceId, SessionDocument $document): void

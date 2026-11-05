@@ -4,6 +4,7 @@ use App\Models\User;
 use App\Providers\MusicModuleIntegrationProvider;
 use App\Support\UploadedSessionMedia;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\RecordNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -37,7 +38,7 @@ it('saves, recovers and reopens portable sessions using actual verified uploaded
     $disk = Storage::fake('music-session-integration');
     $actor = User::factory()->create();
     $other = User::factory()->create();
-    foreach (['music.projects.write', 'music.projects.read', 'music.media.upload', 'music.media.read'] as $ability) {
+    foreach (['music.projects.write', 'music.projects.read', 'music.media.upload', 'music.media.read', 'music.media.retain'] as $ability) {
         Gate::define($ability, fn ($user, $workspace) => $user->getKey() === $actor->getKey() && in_array($workspace, ['studio', 'other']));
     }
     $scanner = Mockery::mock(MalwareScanner::class);
@@ -62,12 +63,28 @@ it('saves, recovers and reopens portable sessions using actual verified uploaded
     expect(fn () => $sessions->save($actor, $command))->toThrow(AuthorizationException::class);
     expect(DB::table('music_projects')->count())->toBe(0);
     $asset = $uploads->complete($actor, 'studio', $mediaId);
+    Gate::define('music.media.retain', fn () => false);
+    expect(fn () => $sessions->save($actor, $command))->toThrow(AuthorizationException::class);
+    expect(DB::table('music_projects')->count())->toBe(0)
+        ->and(DB::table('music_media_retention')->count())->toBe(0);
+    Gate::define('music.media.retain', fn ($user, $workspace) => $user->getKey() === $actor->getKey() && $workspace === 'studio');
+    DB::unprepared("CREATE TRIGGER refuse_revision BEFORE INSERT ON music_project_revisions BEGIN SELECT RAISE(ABORT, 'revision failed'); END");
+    expect(fn () => $sessions->save($actor, $command))->toThrow(QueryException::class);
+    expect(DB::table('music_projects')->count())->toBe(0)
+        ->and(DB::table('music_media_retention')->count())->toBe(0);
+    DB::unprepared('DROP TRIGGER refuse_revision');
     $first = $sessions->save($actor, $command);
+    $sessions->save($actor, $command);
+    expect(DB::table('music_media_retention')->count())->toBe(1)
+        ->and(DB::table('music_media_retention')->value('reference_id'))->toBe($projectId.':1');
     expect($first->document->assets())->toBe([$asset->reference()]);
     $draft = $sessions->save($actor, new SaveSession('studio', $projectId, 'Autosaved take', $document, 1, 'draft', true));
     $recovered = $sessions->recover($actor, 'studio', $projectId, $draft->version, 2, 'recover');
     $manifest = $sessions->export($actor, 'studio', $projectId);
     $reopened = $sessions->import($actor, 'studio', (string) Str::uuid(), $manifest, 'reopen');
+    expect(DB::table('music_media_retention')->count())->toBe(4)
+        ->and(DB::table('music_media_retention')->where('asset_id', $mediaId)->pluck('reference_id')->all())
+        ->toContain($projectId.':1', $projectId.':2', $projectId.':3', $reopened->projectId.':1');
     expect($recovered->autosave)->toBeFalse()->and($recovered->version)->toBe(3)
         ->and($reopened->document->jsonSerialize())->toBe($document->jsonSerialize())
         ->and($sessions->get($actor, 'studio', $projectId)->document->assets())->toBe([$asset->reference()]);
@@ -92,7 +109,7 @@ it('reopens a saved session after authorized restoration without rewriting its r
     config()->set('music-media.disk', 'session-restore-test');
     $disk = Storage::fake('session-restore-test');
     $actor = User::factory()->create();
-    foreach (['music.media.upload', 'music.media.read', 'music.media.restore', 'music.projects.read', 'music.projects.write'] as $ability) {
+    foreach (['music.media.upload', 'music.media.read', 'music.media.restore', 'music.media.retain', 'music.projects.read', 'music.projects.write'] as $ability) {
         Gate::define($ability, fn ($user, $workspace) => $user->getKey() === $actor->getKey() && $workspace === 'studio');
     }
     $scanner = Mockery::mock(MalwareScanner::class);

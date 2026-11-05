@@ -1,6 +1,6 @@
 {
   "name": "liberusoftware/music-projects",
-  "description": "Actor-authorized Music session documents, revisions and autosave recovery.",
+  "description": "Actor-authorized Music session documents, revisions, transactional media retention and autosave recovery.",
   "type": "liberu-module",
   "license": "MIT",
   "version": "0.1.0",

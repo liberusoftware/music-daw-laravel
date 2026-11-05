@@ -181,7 +181,7 @@ it('integrates the foundation registry using the authenticated principal and val
 
 it('backfills Unicode search names when upgrading existing uploaded assets', function () {
     $asset = ($this->publish)('ÉLECTRIC old recording');
-    $this->artisan('migrate:rollback', ['--path' => realpath(__DIR__.'/../../database/migrations'), '--realpath' => true, '--step' => 2])->assertSuccessful();
+    $this->artisan('migrate:rollback', ['--path' => realpath(__DIR__.'/../../database/migrations'), '--realpath' => true, '--step' => 3])->assertSuccessful();
     expect(Schema::hasColumn('music_media_uploads', 'search_name'))->toBeFalse();
     expect(DB::table('music_media_uploads')->where('id', $asset->id)->value('name'))->toBe('ÉLECTRIC old recording');
     $this->artisan('migrate', ['--path' => realpath(__DIR__.'/../../database/migrations'), '--realpath' => true])->assertSuccessful();

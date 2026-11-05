@@ -6768,7 +6768,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library",
-                "reference": "63ba5a5bbd94575faf5ca4fcd5ab7abc6c7f9146"
+                "reference": "9e282935b984db1fe459d61a8ef5b4e21e68dd7a"
             },
             "require": {
                 "illuminate/auth": "^13.38",
@@ -6814,7 +6814,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Private Music audio uploads, recoverable verified assets, waveforms and authorized catalogs.",
+            "description": "Private Music audio uploads, recoverable verified assets, retention, waveforms and authorized catalogs.",
             "transport-options": {
                 "symlink": true,
                 "relative": true
@@ -6826,7 +6826,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-projects",
-                "reference": "d1e3c674e60c90fd182d87532f444e55956e96ba"
+                "reference": "82f13fbadd9f5cd47771d5e45fe8a05ef756426c"
             },
             "require": {
                 "illuminate/auth": "^13.38",
@@ -6870,7 +6870,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Actor-authorized Music session documents, revisions and autosave recovery.",
+            "description": "Actor-authorized Music session documents, revisions, transactional media retention and autosave recovery.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

@@ -4,7 +4,9 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Contracts\Auth\Access\Gate;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\RecordNotFoundException;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -12,6 +14,7 @@ use Illuminate\Validation\ValidationException;
 use Liberu\Foundation\Files\Contracts\MediaAccess;
 use Liberu\Music\Projects\Commands\SaveSession;
 use Liberu\Music\Projects\Contracts\ProjectAccess;
+use Liberu\Music\Projects\Contracts\SessionMediaRetention;
 use Liberu\Music\Projects\Contracts\VerifiedMedia;
 use Liberu\Music\Projects\Data\SessionDocument;
 use Liberu\Music\Projects\Events\SessionSaved;
@@ -183,6 +186,9 @@ it('denies missing media authorization and validates authoritative workspace met
     $catalogue = Mockery::mock(VerifiedMedia::class);
     $catalogue->shouldReceive('resolve')->with($this->actor, 'studio', 'asset-1')->andReturn($asset);
     app()->instance(VerifiedMedia::class, $catalogue);
+    $retention = Mockery::mock(SessionMediaRetention::class);
+    $retention->shouldReceive('retain')->andReturnNull();
+    app()->instance(SessionMediaRetention::class, $retention);
     $sessions = app(ProjectSessions::class);
     $sessions->save($this->actor, $command);
     expect($sessions->get($this->actor, 'studio', $this->projectId)->document->assets())->toBe([$asset]);
@@ -252,4 +258,39 @@ it('browses only current sessions in a bounded workspace and template catalogue'
     expect(fn () => $this->sessions->browse($this->actor, 'studio', before: 0))->toThrow(ValidationException::class);
     app(Gate::class)->define('music.projects.read', fn ($actor, $workspace, $project) => $project !== $second->projectId);
     expect(fn () => $this->sessions->browse($this->actor, 'studio'))->toThrow(AuthorizationException::class);
+});
+
+it('fails closed without retention and rolls retention back when a revision cannot commit', function () {
+    $asset = ['id' => 'external-media', 'sha256' => str_repeat('a', 64), 'sample_rate' => 48000, 'channels' => 1, 'frames' => 48000];
+    $input = SessionDocument::empty()->jsonSerialize();
+    $input['assets'] = [$asset];
+    $command = new SaveSession('studio', $this->projectId, 'Audio', SessionDocument::fromArray($input), 0, 'save');
+    $access = Mockery::mock(MediaAccess::class);
+    $access->shouldReceive('authorized')->andReturn(true);
+    app()->instance(MediaAccess::class, $access);
+    $catalog = Mockery::mock(VerifiedMedia::class);
+    $catalog->shouldReceive('resolve')->andReturn($asset);
+    app()->instance(VerifiedMedia::class, $catalog);
+    expect(fn () => app(ProjectSessions::class)->save($this->actor, $command))->toThrow(LogicException::class, 'retention owner');
+    expect(DB::table('music_projects')->count())->toBe(0);
+    Schema::create('retention_spy', function (Blueprint $table) {
+        $table->string('media_id');
+    });
+    $retention = Mockery::mock(SessionMediaRetention::class);
+    $retention->shouldReceive('retain')->andReturnUsing(function ($actor, $workspace, $project, $version, $ids, $transaction) {
+        expect($transaction)->toBe(DB::connection())->and($transaction->transactionLevel())->toBeGreaterThan(0)
+            ->and($workspace)->toBe('studio')->and($version)->toBe(1)->and($ids)->toBe(['external-media']);
+        $transaction->table('retention_spy')->insert(['media_id' => $ids[0]]);
+    });
+    app()->instance(SessionMediaRetention::class, $retention);
+    DB::unprepared("CREATE TRIGGER refuse_revision BEFORE INSERT ON music_project_revisions BEGIN SELECT RAISE(ABORT, 'revision failed'); END");
+    expect(fn () => app(ProjectSessions::class)->save($this->actor, $command))->toThrow(QueryException::class);
+    expect(DB::table('retention_spy')->count())->toBe(0)->and(DB::table('music_projects')->count())->toBe(0);
+    DB::unprepared('DROP TRIGGER refuse_revision');
+    $sessions = app(ProjectSessions::class);
+    $sessions->save($this->actor, $command);
+    expect(DB::table('retention_spy')->count())->toBe(1);
+    DB::table('retention_spy')->delete();
+    $sessions->save($this->actor, $command);
+    expect(DB::table('retention_spy')->count())->toBe(1)->and(DB::table('music_project_revisions')->count())->toBe(1);
 });
