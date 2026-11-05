@@ -8,7 +8,7 @@
 
 ## What it is
 
-Liberu Music is the Laravel host skeleton for a proposed modular Digital Audio Workstation for songwriters, musicians, producers, composers and mix engineers. It starts from [Liberu Boilerplate](https://github.com/liberusoftware/boilerplate-laravel/tree/95f445a2901f2296959bec24229c6a1d5d5a6815), preserving its application structure and shared foundation modules and themes.
+Liberu Music is the Laravel host skeleton for a proposed modular Digital Audio Workstation for songwriters, musicians, producers, composers and mix engineers. It starts from [Liberu Boilerplate](https://github.com/liberusoftware/project-boilerplate-laravel-filament/tree/95f445a2901f2296959bec24229c6a1d5d5a6815), preserving its application structure and shared foundation modules and themes.
 
 **Status: initial skeleton.** Music-specific capabilities are planned, not implemented. The 88 separate module repositories contain README placeholders only; they are not installable Composer packages and are not required by this host. No audio engine, recording, editing, endpoints or Music UI is provided yet.
 
@@ -56,7 +56,7 @@ The [product scope](https://github.com/liberusoftware/documentation/blob/main/pr
 These commands set up the inherited Laravel foundation only.
 
 ```bash
-git clone https://github.com/liberusoftware/music-daw-laravel.git
+git clone https://github.com/liberusoftware/project-music-daw-laravel-filament.git
 cd music-daw-laravel
 composer install
 cp .env.example .env
@@ -115,19 +115,19 @@ Implementation starts with architecture decisions and a measured local recording
 
 | Project | Repository | Scope |
 |---|---|---|
-| Accounting | [liberusoftware/accounting-erp-laravel](https://github.com/liberusoftware/accounting-erp-laravel) | Ledgers, banking, tax, expenses, close, and reporting |
-| Automation | [liberusoftware/automation-laravel](https://github.com/liberusoftware/automation-laravel) | Governed workflows, provider-neutral AI, approvals, and connectors |
-| Billing | [liberusoftware/billing-laravel](https://github.com/liberusoftware/billing-laravel) | Billing, subscriptions, payments, invoices, and revenue operations |
-| Boilerplate | [liberusoftware/boilerplate-laravel](https://github.com/liberusoftware/boilerplate-laravel) | Modular Laravel foundation and reference implementation |
-| Browser game | [liberusoftware/browser-game-laravel](https://github.com/liberusoftware/browser-game-laravel) | Browser-based game platform and domain capabilities |
-| CMS | [liberusoftware/cms-laravel](https://github.com/liberusoftware/cms-laravel) | Content, publishing, pages, media, search, and delivery |
-| Control panel | [liberusoftware/control-panel-laravel](https://github.com/liberusoftware/control-panel-laravel) | Hosting, infrastructure, DNS, mail, backups, and operations |
-| CRM | [liberusoftware/crm-laravel](https://github.com/liberusoftware/crm-laravel) | Customers, leads, opportunities, sales, and service |
-| Ecommerce | [liberusoftware/ecommerce-laravel](https://github.com/liberusoftware/ecommerce-laravel) | Catalogues, checkout, orders, fulfilment, and returns |
-| Genealogy | [liberusoftware/genealogy-laravel](https://github.com/liberusoftware/genealogy-laravel) | Genealogy records, relationships, sources, and research |
-| Maintenance | [liberusoftware/maintenance-laravel](https://github.com/liberusoftware/maintenance-laravel) | Maintenance planning, assets, work orders, and operations |
-| Real estate | [liberusoftware/real-estate-laravel](https://github.com/liberusoftware/real-estate-laravel) | Property, listing, tenancy, and transaction workflows |
-| Social network | [liberusoftware/social-network-laravel](https://github.com/liberusoftware/social-network-laravel) | Social profiles, groups, content, messaging, and discovery |
+| Accounting | [liberusoftware/accounting-erp-laravel](https://github.com/liberusoftware/project-accounting-erp-laravel-filament) | Ledgers, banking, tax, expenses, close, and reporting |
+| Automation | [liberusoftware/automation-laravel](https://github.com/liberusoftware/project-automation-laravel-filament) | Governed workflows, provider-neutral AI, approvals, and connectors |
+| Billing | [liberusoftware/billing-laravel](https://github.com/liberusoftware/project-billing-laravel-filament) | Billing, subscriptions, payments, invoices, and revenue operations |
+| Boilerplate | [liberusoftware/boilerplate-laravel](https://github.com/liberusoftware/project-boilerplate-laravel-filament) | Modular Laravel foundation and reference implementation |
+| Browser game | [liberusoftware/browser-game-laravel](https://github.com/liberusoftware/project-browser-game-laravel-filament) | Browser-based game platform and domain capabilities |
+| CMS | [liberusoftware/cms-laravel](https://github.com/liberusoftware/project-cms-laravel-filament) | Content, publishing, pages, media, search, and delivery |
+| Control panel | [liberusoftware/control-panel-laravel](https://github.com/liberusoftware/project-control-panel-laravel-filament) | Hosting, infrastructure, DNS, mail, backups, and operations |
+| CRM | [liberusoftware/crm-laravel](https://github.com/liberusoftware/project-crm-laravel-filament) | Customers, leads, opportunities, sales, and service |
+| Ecommerce | [liberusoftware/ecommerce-laravel](https://github.com/liberusoftware/project-ecommerce-laravel-filament) | Catalogues, checkout, orders, fulfilment, and returns |
+| Genealogy | [liberusoftware/genealogy-laravel](https://github.com/liberusoftware/project-genealogy-laravel-filament) | Genealogy records, relationships, sources, and research |
+| Maintenance | [liberusoftware/maintenance-laravel](https://github.com/liberusoftware/project-maintenance-laravel-filament) | Maintenance planning, assets, work orders, and operations |
+| Real estate | [liberusoftware/real-estate-laravel](https://github.com/liberusoftware/project-real-estate-laravel-filament) | Property, listing, tenancy, and transaction workflows |
+| Social network | [liberusoftware/social-network-laravel](https://github.com/liberusoftware/project-social-network-laravel-filament) | Social profiles, groups, content, messaging, and discovery |
 
 ## Security
 
@@ -143,4 +143,43 @@ Feedback and contributions are welcome. Report reproducible bugs, propose focuse
 
 ## Contributors
 
-Thank you to everyone who helps improve Liberu. [View the contributors graph](https://github.com/liberusoftware/music-daw-laravel/graphs/contributors).
+Thank you to everyone who helps improve Liberu. [View the contributors graph](https://github.com/liberusoftware/project-music-daw-laravel-filament/graphs/contributors).
+
+<!-- presentation-family:begin -->
+## Project family and presentation options
+
+This repository hosts **Music DAW with Laravel and Filament**. Composition, recording, sequencing and audio production. Its existing installation instructions and manifests govern this application. The other presentations are independent skeletons derived from their matching Boilerplate foundation; repository availability does not establish product feature parity.
+
+### Other Laravel and Filament projects
+
+| Project | Scope |
+| --- | --- |
+| [Boilerplate](https://github.com/liberusoftware/project-boilerplate-laravel-filament) | Shared application foundation and module composition |
+| [Accounting ERP](https://github.com/liberusoftware/project-accounting-erp-laravel-filament) | Ledgers, tax, reporting and finance workflows |
+| [Automation](https://github.com/liberusoftware/project-automation-laravel-filament) | AI gateways, approvals, rules and integrations |
+| [Billing](https://github.com/liberusoftware/project-billing-laravel-filament) | Subscriptions, pricing, payments and provisioning |
+| [Browser Game](https://github.com/liberusoftware/project-browser-game-laravel-filament) | Game worlds, players and community workflows |
+| [CMS](https://github.com/liberusoftware/project-cms-laravel-filament) | Content authoring, publishing and delivery |
+| [Control Panel](https://github.com/liberusoftware/project-control-panel-laravel-filament) | Infrastructure and hosting operations |
+| [CRM](https://github.com/liberusoftware/project-crm-laravel-filament) | Relationships, sales pipelines and customer service |
+| [Ecommerce](https://github.com/liberusoftware/project-ecommerce-laravel-filament) | Catalogs, checkout, orders and fulfillment |
+| [Enterprise SAP](https://github.com/liberusoftware/project-enterprise-sap-laravel-filament) | Enterprise workspace and cross-product orchestration |
+| [Genealogy](https://github.com/liberusoftware/project-genealogy-laravel-filament) | Family trees, research, evidence and collaboration |
+| [Liberu Platform](https://github.com/liberusoftware/project-liberu-official-laravel-filament) | Official sites, staff applications and platform composition |
+| [Maintenance](https://github.com/liberusoftware/project-maintenance-laravel-filament) | Assets, work orders, schedules and field operations |
+| [Real Estate](https://github.com/liberusoftware/project-real-estate-laravel-filament) | Listings, sales, lettings and agency operations |
+| [Social Network](https://github.com/liberusoftware/project-social-network-laravel-filament) | Profiles, feeds, communities and moderation |
+
+### Other presentations for Music DAW
+
+- [Laravel · Inertia · Vue](https://github.com/liberusoftware/project-music-daw-laravel-inertia-vue): Laravel routes and sessions with Vue pages over the Inertia protocol.
+- [Laravel · Inertia · React](https://github.com/liberusoftware/project-music-daw-laravel-inertia-react): Laravel routes and sessions with React pages over the Inertia protocol.
+- [Nuxt · Vue](https://github.com/liberusoftware/project-music-daw-nuxt-vue): Independent Vue application with Nuxt server rendering and reviewed API integration.
+- [Next.js · React](https://github.com/liberusoftware/project-music-daw-next-react): Independent React application with explicit Next.js server/client boundaries.
+- [React Native · Expo](https://github.com/liberusoftware/project-music-daw-mobile-react): Native iOS/Android application using React Native and Expo.
+- [Flutter · Mobile](https://github.com/liberusoftware/project-music-daw-mobile-flutter): Flutter iOS/Android application using Dart and mobile widgets.
+- [Dart · Desktop](https://github.com/liberusoftware/project-music-daw-dart-desktop): Dedicated Dart desktop application with a Flutter host for Linux, macOS and Windows.
+- [Dart · Mobile](https://github.com/liberusoftware/project-music-daw-dart-mobile): Separate Dart mobile application with a Flutter host for iOS and Android.
+
+Use the [presentation implementation guides](https://github.com/liberusoftware/documentation/blob/main/guides/presentation/README.md) and [product documentation](https://github.com/liberusoftware/documentation/blob/main/projects/music/README.md) to select compatible modules, reviewed contracts and the correct deployment boundary. Laravel remains authoritative for domain rules and tenant authorization across all clients.
+<!-- presentation-family:end -->
