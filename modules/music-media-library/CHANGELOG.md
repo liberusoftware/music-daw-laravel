@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add private integrity-verified download snapshots with live domain and foundation transfer approval.
+
 - Add durable owner-scoped queued upload verification and original-identity restoration, commit-bound events, retry recovery and serialized cancellation/publication.
 - Distinguish metadata command reuse from stale versions without breaking parent exception catches; reject version overflow.
 

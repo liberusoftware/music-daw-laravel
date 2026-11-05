@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Foundation\Files\Contracts\MediaAccess;
+use Liberu\Foundation\ImportExport\Contracts\TransferAuthorizer;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\Events\AssetReady;
@@ -22,6 +23,7 @@ use Liberu\Music\MediaLibrary\Exceptions\UploadConflict;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Services\AssetWaveforms;
 use Liberu\Music\MediaLibrary\Services\ContentLocks;
+use Liberu\Music\MediaLibrary\Services\MediaDownloads;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
 use Liberu\Music\MediaLibrary\Services\UploadBudgets;
 use Liberu\Music\MediaLibrary\Services\WaveformIndexer;
@@ -370,4 +372,56 @@ it('authorizes foundation media reads through the configured principal provider 
     expect($access->authorized(7, $this->id, 'read'))->toBeFalse();
     expect(app(ScopedMediaAccess::class))->toBeInstanceOf(ScopedMediaAccess::class)
         ->and(app()->bound(MediaAccess::class))->toBeFalse();
+});
+
+it('opens an integrity-verified download snapshot only with live domain and foundation transfer authorization', function () {
+    ($this->receive)();
+    $this->uploads->complete($this->actor, 'studio', $this->id);
+    app(Gate::class)->define('music.media.download', fn () => true);
+    $downloads = app(MediaDownloads::class);
+    expect(fn () => $downloads->open($this->actor, 'studio', $this->id))->toThrow(AuthorizationException::class);
+    $allowed = false;
+    $transfers = Mockery::mock(TransferAuthorizer::class);
+    $transfers->shouldReceive('allowed')->with('7', 'music-media-asset', 'export')->andReturnUsing(function () use (&$allowed) {
+        return $allowed;
+    });
+    app()->instance(TransferAuthorizer::class, $transfers);
+    $downloads = app(MediaDownloads::class);
+    expect(fn () => $downloads->open($this->actor, 'studio', $this->id))->toThrow(AuthorizationException::class);
+    $allowed = true;
+    $stream = $downloads->open($this->actor, 'studio', $this->id);
+    $key = DB::table('music_media_uploads')->where('id', $this->id)->value('blob_key');
+    $this->disk->put($key, 'changed after opening');
+    try {
+        expect(stream_get_contents($stream))->toBe($this->bytes);
+        rewind($stream);
+        expect(stream_get_contents($stream))->toBe($this->bytes);
+    } finally {
+        fclose($stream);
+    }
+    app(Gate::class)->define('music.media.download', fn () => false);
+    expect(fn () => $downloads->open($this->actor, 'studio', $this->id))->toThrow(AuthorizationException::class);
+    app(Gate::class)->define('music.media.download', fn () => true);
+    app(Gate::class)->define('music.media.read', fn () => false);
+    expect(fn () => $downloads->open($this->actor, 'studio', $this->id))->toThrow(AuthorizationException::class);
+});
+
+it('rejects unverified unavailable cross-workspace and corrupted downloadable media', function () {
+    app(Gate::class)->define('music.media.download', fn () => true);
+    app()->instance(TransferAuthorizer::class,
+        Mockery::mock(TransferAuthorizer::class)->shouldReceive('allowed')->andReturn(true)->getMock());
+    $downloads = app(MediaDownloads::class);
+    ($this->receive)();
+    expect(fn () => $downloads->open($this->actor, 'studio', $this->id))->toThrow(RecordNotFoundException::class);
+    $this->uploads->complete($this->actor, 'studio', $this->id);
+    expect(fn () => $downloads->open($this->actor, 'other', $this->id))->toThrow(RecordNotFoundException::class);
+    $key = DB::table('music_media_uploads')->where('id', $this->id)->value('blob_key');
+    foreach ([substr($this->bytes, 0, -1), $this->bytes.'x', str_repeat('x', strlen($this->bytes))] as $bad) {
+        $this->disk->put($key, $bad);
+        expect(fn () => $downloads->open($this->actor, 'studio', $this->id))->toThrow(InvalidAudio::class);
+    }
+    $this->disk->delete($key);
+    expect(fn () => $downloads->open($this->actor, 'studio', $this->id))->toThrow(InvalidAudio::class);
+    DB::table('music_media_uploads')->where('id', $this->id)->update(['status' => 'trashed']);
+    expect(fn () => $downloads->open($this->actor, 'studio', $this->id))->toThrow(RecordNotFoundException::class);
 });
