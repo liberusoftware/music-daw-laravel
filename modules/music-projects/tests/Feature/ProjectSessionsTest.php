@@ -19,6 +19,7 @@ use Liberu\Music\Projects\Contracts\VerifiedMedia;
 use Liberu\Music\Projects\Data\SessionDocument;
 use Liberu\Music\Projects\Events\SessionSaved;
 use Liberu\Music\Projects\Exceptions\IdempotencyConflict;
+use Liberu\Music\Projects\Exceptions\ProjectTypeConflict;
 use Liberu\Music\Projects\Exceptions\RevisionConflict;
 use Liberu\Music\Projects\MusicProjectsServiceProvider;
 use Liberu\Music\Projects\Services\ProjectSessions;
@@ -394,4 +395,11 @@ it('distinguishes conflicting command reuse from a stale revision through typed 
     } catch (RevisionConflict $exception) {
         expect($exception)->not->toBeInstanceOf(IdempotencyConflict::class);
     }
+});
+
+it('reports a typed immutable template conflict when the expected revision is current', function () {
+    $this->sessions->save($this->actor, ($this->command)(0, 'template', false, true));
+    expect(fn () => $this->sessions->save($this->actor, ($this->command)(1, 'change-type')))
+        ->toThrow(ProjectTypeConflict::class);
+    expect(DB::table('music_projects')->value('version'))->toBe(1);
 });

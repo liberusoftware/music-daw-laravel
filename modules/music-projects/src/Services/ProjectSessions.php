@@ -24,6 +24,7 @@ use Liberu\Music\Projects\Data\SessionPage;
 use Liberu\Music\Projects\Data\SessionRevision;
 use Liberu\Music\Projects\Events\SessionSaved;
 use Liberu\Music\Projects\Exceptions\IdempotencyConflict;
+use Liberu\Music\Projects\Exceptions\ProjectTypeConflict;
 use Liberu\Music\Projects\Exceptions\RevisionConflict;
 use LogicException;
 
@@ -72,8 +73,11 @@ final readonly class ProjectSessions
 
                 return $revision;
             }
-            if ((int) $project->version !== $command->expectedVersion || (bool) $project->template !== $command->template) {
+            if ((int) $project->version !== $command->expectedVersion) {
                 throw new RevisionConflict('The session changed; reload it before saving.');
+            }
+            if ((bool) $project->template !== $command->template) {
+                throw new ProjectTypeConflict('The existing session template type cannot be changed.');
             }
             $version = $command->expectedVersion + 1;
             $updated = $this->database->table('music_projects')->where('id', $command->projectId)
