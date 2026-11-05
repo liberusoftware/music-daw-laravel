@@ -145,7 +145,7 @@ jobs:
       APP_KEY: base64:3xVFJ5tTr05dWL1gsJqF+UvWdv3X0Cz/CBaUG47hb3U=
       APP_URL: http://127.0.0.1:8743
       DB_CONNECTION: sqlite
-      DB_DATABASE: ${{ runner.temp }}/music-livewire-browser.sqlite
+      DB_DATABASE: ${{ github.workspace }}/music-livewire-browser.sqlite
       DB_URL: ''
       CACHE_STORE: array
       SESSION_DRIVER: database
@@ -159,8 +159,8 @@ jobs:
       MUSIC_BROWSER_URL: http://127.0.0.1:8743
       MUSIC_BROWSER_EMAIL: browser-musician@example.test
       MUSIC_BROWSER_PASSWORD: Browser-Test-Password-42!
-      MUSIC_BROWSER_OUTPUT: ${{ runner.temp }}/music-browser-artifacts
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/music-browser-binaries
+      MUSIC_BROWSER_OUTPUT: ${{ github.workspace }}/music-browser-artifacts
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/music-browser-binaries
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
@@ -205,5 +205,5 @@ jobs:
         with:
           name: projects-livewire-browser
           path: |
-            ${{ runner.temp }}/music-browser-artifacts
+            ${{ github.workspace }}/music-browser-artifacts
             ${{ runner.temp }}/music-browser-server.log
