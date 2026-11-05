@@ -13,6 +13,13 @@
     "repositories": [
         {
             "type": "path",
+            "url": "modules/music-media-library",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
             "url": "modules/music-projects",
             "options": {
                 "symlink": true
@@ -426,6 +433,7 @@
         "liberusoftware/localization-mymemory": "^1.0",
         "liberusoftware/module-manager": "^1.0",
         "liberusoftware/module-manager-filament": "^1.1",
+        "liberusoftware/music-media-library": "^0.1",
         "liberusoftware/music-projects": "^0.1",
         "liberusoftware/notifications": "^1.0",
         "liberusoftware/observability": "^1.0",

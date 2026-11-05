@@ -1,0 +1,42 @@
+{
+  "name": "liberusoftware/music-media-library",
+  "description": "Verified Music media metadata and audio asset inspection.",
+  "type": "liberu-module",
+  "license": "MIT",
+  "version": "0.1.0",
+  "require": {
+    "php": "^8.5",
+    "illuminate/support": "^13.38",
+    "liberusoftware/files-media": "^1.4",
+    "liberusoftware/search": "^1.5",
+    "liberusoftware/import-export": "^1.4"
+  },
+  "autoload": {
+    "psr-4": {
+      "Liberu\\Music\\MediaLibrary\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Liberu\\Music\\MediaLibrary\\Tests\\": "tests/"
+    }
+  },
+  "require-dev": {
+    "liberusoftware/package-testbench": "^1.8",
+    "pestphp/pest": "^5.3"
+  },
+  "extra": {
+    "liberu": {
+      "name": "music-media-library"
+    }
+  },
+  "scripts": {
+    "test": "pest",
+    "test:coverage": "pest --coverage --min=100"
+  },
+  "config": {
+    "allow-plugins": {
+      "pestphp/pest-plugin": true
+    }
+  }
+}

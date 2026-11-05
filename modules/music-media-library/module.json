@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schemas.liberu.dev/module/v1.json",
+  "name": "music-media-library",
+  "display_name": "Music Media Library",
+  "description": "Verified Music media metadata and audio asset inspection.",
+  "version": "0.1.0",
+  "category": "product",
+  "provider": "Liberu\\Music\\MediaLibrary\\MusicMediaLibraryServiceProvider",
+  "requires": {
+    "php": "^8.5",
+    "laravel": "^13.0",
+    "packages": {
+      "liberusoftware/files-media": "^1.4",
+      "liberusoftware/search": "^1.5",
+      "liberusoftware/import-export": "^1.4"
+    }
+  },
+  "capabilities": [
+    "music.media-library"
+  ],
+  "default_enabled": false,
+  "features": [
+    "Verified audio metadata"
+  ]
+}

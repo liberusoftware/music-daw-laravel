@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "1a3ac4eac878bfe526b436c1730bb4d7",
+    "content-hash": "37cc540351c0cd7b9486d15677d3b763",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -6757,6 +6757,58 @@
                 "MIT"
             ],
             "description": "Filament operations presentation adapter for the Liberu Module Manager.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "liberusoftware/music-media-library",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "modules/music-media-library",
+                "reference": "96c32eb63e4a3c2d0759b94354ed00b977d41a35"
+            },
+            "require": {
+                "illuminate/support": "^13.38",
+                "liberusoftware/files-media": "^1.4",
+                "liberusoftware/import-export": "^1.4",
+                "liberusoftware/search": "^1.5",
+                "php": "^8.5"
+            },
+            "require-dev": {
+                "liberusoftware/package-testbench": "^1.8",
+                "pestphp/pest": "^5.3"
+            },
+            "type": "liberu-module",
+            "extra": {
+                "liberu": {
+                    "name": "music-media-library"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Liberu\\Music\\MediaLibrary\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Liberu\\Music\\MediaLibrary\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ],
+                "test:coverage": [
+                    "pest --coverage --min=100"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Verified Music media metadata and audio asset inspection.",
             "transport-options": {
                 "symlink": true,
                 "relative": true
