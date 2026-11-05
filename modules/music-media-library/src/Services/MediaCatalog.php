@@ -79,6 +79,14 @@ final readonly class MediaCatalog
         return new LengthAwarePaginator($items, $total, $search->perPage, $search->page);
     }
 
+    public function get(Authenticatable $actor, string $workspaceId, string $assetId): CatalogEntry
+    {
+        $row = $this->query(new SearchAssets($workspaceId))->where('assets.id', $assetId)
+            ->firstOrFail(['assets.id', 'assets.name as original_name', 'assets.metadata', 'assets.provenance', 'assets.duplicate_of', 'assets.blob_key', 'annotations.name', 'annotations.tags', 'annotations.version']);
+
+        return $this->entries($actor, $workspaceId, [$row])[0];
+    }
+
     public function browse(Authenticatable $actor, BrowseAssets $command): AssetPage
     {
         $this->access->authorize($actor, $command->workspaceId, '*', 'list');

@@ -220,3 +220,14 @@ it('keeps cursor pages workspace scoped and rechecks list and asset permissions'
     app(Gate::class)->define('music.media.read', fn () => false);
     expect(fn () => $this->catalog->browse($this->actor, new BrowseAssets('studio')))->toThrow(AuthorizationException::class);
 });
+
+it('reads current annotated asset metadata with availability and workspace authorization', function () {
+    $asset = ($this->publish)();
+    $this->catalog->update($this->actor, new UpdateAssetMetadata('studio', $asset->id, 'Edited take', ['Voice'], 0, 'edit'));
+    $current = $this->catalog->get($this->actor, 'studio', $asset->id);
+    expect($current->name)->toBe('Edited take')->and($current->tags)->toBe(['voice'])->and($current->version)->toBe(1)->and($current->available)->toBeTrue();
+    Storage::disk('catalog-test')->delete(DB::table('music_media_uploads')->where('id', $asset->id)->value('blob_key'));
+    expect($this->catalog->get($this->actor, 'studio', $asset->id)->available)->toBeFalse();
+    expect(fn () => $this->catalog->get($this->actor, 'other', $asset->id))->toThrow(RecordNotFoundException::class);
+    expect(fn () => $this->catalog->get(new GenericUser(['id' => 8]), 'studio', $asset->id))->toThrow(AuthorizationException::class);
+});
