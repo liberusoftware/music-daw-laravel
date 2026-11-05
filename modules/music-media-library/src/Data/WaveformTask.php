@@ -13,6 +13,8 @@ final readonly class WaveformTask implements JsonSerializable
     public function jsonSerialize(): array
     {
         return ['schema_version' => 1, 'id' => $this->id, 'workspace_id' => $this->workspaceId,
-            'asset_id' => $this->assetId, 'requested_sample_frames_per_peak' => $this->framesPerPeak, 'status' => $this->status];
+            'asset_id' => $this->assetId, 'requested_sample_frames_per_peak' => $this->framesPerPeak, 'status' => $this->status,
+            'terminal' => in_array($this->status, ['ready', 'failed', 'cancelled'], true), 'cancellable' => $this->status === 'queued',
+            'progress' => ['completed_steps' => $this->status === 'ready' ? 1 : 0, 'total_steps' => 1, 'unit' => 'waveform_build']];
     }
 }

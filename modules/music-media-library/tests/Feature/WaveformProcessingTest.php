@@ -16,10 +16,12 @@ use Illuminate\Validation\ValidationException;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Music\MediaLibrary\Commands\RequestWaveform;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
+use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\Events\WaveformTaskChanged;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
 use Liberu\Music\MediaLibrary\Exceptions\UploadConflict;
 use Liberu\Music\MediaLibrary\Jobs\BuildWaveform;
+use Liberu\Music\MediaLibrary\Services\AssetWaveforms;
 use Liberu\Music\MediaLibrary\Services\CachedWaveforms;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
 use Liberu\Music\MediaLibrary\Services\WaveformProcessing;
@@ -80,7 +82,8 @@ it('queues only after commit and returns authorized versioned task and cached re
     $this->processing->request($this->actor, $command);
     Bus::assertDispatchedTimes(BuildWaveform::class, 1);
     expect($this->events)->toHaveCount(2)->and(json_decode(json_encode($this->events[1]->task), true))->toBe([
-        'schema_version' => 1, 'id' => $task->id, 'workspace_id' => 'studio', 'asset_id' => $this->id, 'requested_sample_frames_per_peak' => 1, 'status' => 'ready',
+        'schema_version' => 1, 'id' => $task->id, 'workspace_id' => 'studio', 'asset_id' => $this->id, 'requested_sample_frames_per_peak' => 1, 'status' => 'ready', 'terminal' => true, 'cancellable' => false,
+        'progress' => ['completed_steps' => 1, 'total_steps' => 1, 'unit' => 'waveform_build'],
     ]);
 });
 
@@ -136,7 +139,7 @@ it('fails closed for removed users or an unavailable canonical provider', functi
     $this->processing->request($this->actor, $command);
     $this->users->shouldReceive('retrieveById')->with('7')->andReturnNull();
     expect(fn () => $this->processing->process($command->taskId))->toThrow(AuthorizationException::class);
-    $processing = new WaveformProcessing(DB::connection(), $this->uploads, $this->cache, null, app(Dispatcher::class), app(Events::class));
+    $processing = new WaveformProcessing(DB::connection(), $this->uploads, $this->cache, null, app(Dispatcher::class), app(Events::class), app(MediaAuthorizer::class));
     expect(fn () => $processing->process($command->taskId))->toThrow(AuthorizationException::class);
 });
 
@@ -178,7 +181,7 @@ it('preserves durable queued work across publication failure and permits retry',
     $command = ($this->command)();
     $bus = Mockery::mock(Dispatcher::class);
     $bus->shouldReceive('dispatch')->once()->andThrow(new RuntimeException('queue unavailable'));
-    $processing = new WaveformProcessing(DB::connection(), $this->uploads, $this->cache, $this->users, $bus, app(Events::class));
+    $processing = new WaveformProcessing(DB::connection(), $this->uploads, $this->cache, $this->users, $bus, app(Events::class), app(MediaAuthorizer::class));
     expect(fn () => $processing->request($this->actor, $command))->toThrow(RuntimeException::class, 'queue unavailable');
     expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued');
     $this->processing->request($this->actor, $command);
@@ -206,7 +209,7 @@ it('keeps cache and status queries bounded without reading source audio', functi
     DB::enableQueryLog();
     DB::flushQueryLog();
     expect($this->processing->result($this->actor, 'studio', $command->taskId))->not->toBeNull();
-    expect(DB::getQueryLog())->toHaveCount(3);
+    expect(DB::getQueryLog())->toHaveCount(2);
     DB::disableQueryLog();
     $migration = require glob(__DIR__.'/../../database/migrations/*create_music_media_waveform_tasks.php')[0];
     $migration->down();
@@ -222,4 +225,75 @@ it('executes through the real sync queue after commit with the canonical request
     $processing->request($this->actor, $command);
     expect($processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('ready')
         ->and($processing->result($this->actor, 'studio', $command->taskId)->audio->sha256)->toBe(hash('sha256', $this->bytes));
+});
+
+it('cancels owned tasks once and prevents replay or late delivery from reopening them', function () {
+    $command = ($this->command)();
+    $this->processing->request($this->actor, $command);
+    $task = $this->processing->cancel($this->actor, 'studio', $command->taskId);
+    expect($task->status)->toBe('cancelled')->and($task->jsonSerialize()['terminal'])->toBeTrue()
+        ->and($task->jsonSerialize()['cancellable'])->toBeFalse()->and($task->jsonSerialize()['progress']['completed_steps'])->toBe(0);
+    expect($this->processing->cancel($this->actor, 'studio', $command->taskId))->toEqual($task);
+    expect($this->processing->request($this->actor, $command))->toEqual($task);
+    $this->processing->process($command->taskId);
+    $this->processing->failed($command->taskId);
+    expect($this->processing->result($this->actor, 'studio', $command->taskId))->toBeNull()->and($this->events)->toHaveCount(2);
+    Bus::assertDispatchedTimes(BuildWaveform::class, 1);
+});
+
+it('checks task ownership and live read permission when cancelling', function () {
+    $command = ($this->command)();
+    $this->processing->request($this->actor, $command);
+    expect(fn () => $this->processing->cancel(new GenericUser(['id' => 8]), 'studio', $command->taskId))->toThrow(RecordNotFoundException::class)
+        ->and(fn () => $this->processing->cancel($this->actor, 'other', $command->taskId))->toThrow(RecordNotFoundException::class);
+    $this->allowed = false;
+    expect(fn () => $this->processing->cancel($this->actor, 'studio', $command->taskId))->toThrow(AuthorizationException::class);
+});
+
+it('keeps cancellation transactional and rejects cancellation after completion or terminal failure', function () {
+    $command = ($this->command)();
+    $this->processing->request($this->actor, $command);
+    DB::beginTransaction();
+    $this->processing->cancel($this->actor, 'studio', $command->taskId);
+    expect($this->events)->toHaveCount(1);
+    DB::rollBack();
+    expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued');
+    $this->processing->process($command->taskId);
+    expect(fn () => $this->processing->cancel($this->actor, 'studio', $command->taskId))->toThrow(UploadConflict::class);
+    $failed = ($this->command)();
+    $this->processing->request($this->actor, $failed);
+    $this->processing->failed($failed->taskId);
+    expect(fn () => $this->processing->cancel($this->actor, 'studio', $failed->taskId))->toThrow(UploadConflict::class);
+});
+
+it('permits failure status and cancellation metadata when source audio is missing', function () {
+    $command = ($this->command)();
+    $this->processing->request($this->actor, $command);
+    $this->disk->delete(DB::table('music_media_uploads')->where('id', $this->id)->value('blob_key'));
+    expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued');
+    expect($this->processing->cancel($this->actor, 'studio', $command->taskId)->status)->toBe('cancelled');
+});
+
+it('refuses an ignored cancellation transition without emitting a false event', function () {
+    $command = ($this->command)();
+    $this->processing->request($this->actor, $command);
+    DB::unprepared("CREATE TRIGGER ignore_cancel BEFORE UPDATE OF status ON music_media_waveform_tasks WHEN NEW.status = 'cancelled' BEGIN SELECT RAISE(IGNORE); END");
+    expect(fn () => $this->processing->cancel($this->actor, 'studio', $command->taskId))->toThrow(UploadConflict::class);
+    expect($this->events)->toHaveCount(1)->and($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued');
+});
+
+it('does not publish a ready result when cancellation commits during derivation', function () {
+    $command = ($this->command)();
+    $this->processing->request($this->actor, $command);
+    $store = Mockery::mock(Repository::class);
+    $store->shouldReceive('remember')->once()->andReturnUsing(function ($key, $ttl, $build) use ($command) {
+        $this->processing->cancel($this->actor, 'studio', $command->taskId);
+
+        return $build();
+    });
+    $cached = new CachedWaveforms($this->uploads, app(AssetWaveforms::class), $store);
+    $processing = new WaveformProcessing(DB::connection(), $this->uploads, $cached, $this->users, app(Dispatcher::class), app(Events::class), app(MediaAuthorizer::class));
+    $processing->process($command->taskId);
+    expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('cancelled')
+        ->and($this->processing->result($this->actor, 'studio', $command->taskId))->toBeNull()->and($this->events)->toHaveCount(2);
 });

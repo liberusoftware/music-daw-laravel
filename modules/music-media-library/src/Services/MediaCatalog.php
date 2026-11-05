@@ -8,12 +8,15 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
+use Liberu\Music\MediaLibrary\Commands\BrowseAssets;
 use Liberu\Music\MediaLibrary\Commands\SearchAssets;
 use Liberu\Music\MediaLibrary\Commands\UpdateAssetMetadata;
 use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\Data\AssetMetadata;
+use Liberu\Music\MediaLibrary\Data\AssetPage;
 use Liberu\Music\MediaLibrary\Data\CatalogEntry;
 use Liberu\Music\MediaLibrary\Events\AssetMetadataUpdated;
 use Liberu\Music\MediaLibrary\Exceptions\MetadataConflict;
@@ -67,6 +70,30 @@ final readonly class MediaCatalog
     public function search(Authenticatable $actor, SearchAssets $search): LengthAwarePaginator
     {
         $this->access->authorize($actor, $search->workspaceId, '*', 'list');
+        $query = $this->query($search);
+        $total = (clone $query)->count();
+        $rows = $query->select(['assets.id', 'assets.name as original_name', 'assets.metadata', 'assets.provenance', 'assets.duplicate_of', 'assets.blob_key', 'annotations.name', 'annotations.tags', 'annotations.version'])
+            ->orderByDesc('assets.created_at')->orderByDesc('assets.id')->offset(($search->page - 1) * $search->perPage)->limit($search->perPage)->get();
+        $items = $this->entries($actor, $search->workspaceId, $rows);
+
+        return new LengthAwarePaginator($items, $total, $search->perPage, $search->page);
+    }
+
+    public function browse(Authenticatable $actor, BrowseAssets $command): AssetPage
+    {
+        $this->access->authorize($actor, $command->workspaceId, '*', 'list');
+        $rows = $this->query($command->filters)
+            ->when($command->beforeAssetId !== null, fn ($query) => $query->where('assets.id', '<', $command->beforeAssetId))
+            ->select(['assets.id', 'assets.name as original_name', 'assets.metadata', 'assets.provenance', 'assets.duplicate_of', 'assets.blob_key', 'annotations.name', 'annotations.tags', 'annotations.version'])
+            ->orderByDesc('assets.id')->limit($command->limit + 1)->get();
+        $more = $rows->count() > $command->limit;
+        $items = $this->entries($actor, $command->workspaceId, $rows->take($command->limit));
+
+        return new AssetPage($items, $more ? $items[count($items) - 1]->id : null);
+    }
+
+    private function query(SearchAssets $search): Builder
+    {
         $query = $this->database->table('music_media_uploads as assets')->leftJoin('music_media_annotations as annotations', 'annotations.asset_id', '=', 'assets.id')
             ->where('assets.workspace_id', $search->workspaceId)->where('assets.status', 'ready');
         if ($search->query !== '') {
@@ -81,18 +108,22 @@ final readonly class MediaCatalog
                 $tags->selectRaw('1')->from('music_media_tags')->whereColumn('music_media_tags.asset_id', 'assets.id')->where('tag_hash', hash('sha256', $tag));
             });
         }
-        $total = (clone $query)->count();
-        $rows = $query->select(['assets.id', 'assets.name as original_name', 'assets.metadata', 'assets.provenance', 'assets.duplicate_of', 'assets.blob_key', 'annotations.name', 'annotations.tags', 'annotations.version'])
-            ->orderByDesc('assets.created_at')->orderByDesc('assets.id')->offset(($search->page - 1) * $search->perPage)->limit($search->perPage)->get();
+
+        return $query;
+    }
+
+    /** @return list<CatalogEntry> */
+    private function entries(Authenticatable $actor, string $workspaceId, iterable $rows): array
+    {
         $items = [];
         foreach ($rows as $row) {
-            $this->access->authorize($actor, $search->workspaceId, $row->id, 'read');
-            $items[] = new CatalogEntry($row->id, $search->workspaceId, $row->name ?? $row->original_name,
+            $this->access->authorize($actor, $workspaceId, $row->id, 'read');
+            $items[] = new CatalogEntry($row->id, $workspaceId, $row->name ?? $row->original_name,
                 json_decode($row->tags ?? '[]', true, flags: JSON_THROW_ON_ERROR), (int) ($row->version ?? 0),
                 json_decode($row->metadata, true, flags: JSON_THROW_ON_ERROR), json_decode($row->provenance, true, flags: JSON_THROW_ON_ERROR),
                 $row->duplicate_of, $this->objects->exists($row->blob_key));
         }
 
-        return new LengthAwarePaginator($items, $total, $search->perPage, $search->page);
+        return $items;
     }
 }

@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Foundation\ImportExport\Contracts\TransferAuthorizer;
 use Liberu\Foundation\Search\Services\SearchService;
+use Liberu\Music\MediaLibrary\Commands\BrowseAssets;
 use Liberu\Music\MediaLibrary\Commands\RequestWaveform;
 use Liberu\Music\MediaLibrary\Commands\SaveMediaPack;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
@@ -54,6 +55,8 @@ it('finds tagged verified audio through the host foundation registry without wid
     expect(fn () => $waveforms->get(User::factory()->create(), 'studio', $taskId))->toThrow(RecordNotFoundException::class);
 
     app(MediaCatalog::class)->update($actor, new UpdateAssetMetadata('studio', $id, 'Kick one', ['DRUMS'], 0, 'tag'));
+    $cursorPage = app(MediaCatalog::class)->browse($actor, new BrowseAssets('studio', tags: ['drums'], limit: 1));
+    expect(array_column($cursorPage->items, 'id'))->toBe([$id])->and($cursorPage->nextAssetId)->toBeNull();
     $this->actingAs($actor);
     $search = app(SearchService::class);
     $page = $search->searchAll(['types' => ['music-media'], 'workspace_id' => 'studio', 'query' => 'kick', 'tags' => ['drums']])['music-media'];

@@ -12,6 +12,7 @@ use Illuminate\Contracts\Events\Dispatcher as Events;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Query\Builder;
 use Liberu\Music\MediaLibrary\Commands\RequestWaveform;
+use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\Data\Waveform;
 use Liberu\Music\MediaLibrary\Data\WaveformTask;
 use Liberu\Music\MediaLibrary\Events\WaveformTaskChanged;
@@ -20,7 +21,7 @@ use Liberu\Music\MediaLibrary\Jobs\BuildWaveform;
 
 final readonly class WaveformProcessing
 {
-    public function __construct(private Connection $database, private MediaUploads $uploads, private CachedWaveforms $waveforms, private ?UserProvider $users, private Dispatcher $bus, private Events $events) {}
+    public function __construct(private Connection $database, private MediaUploads $uploads, private CachedWaveforms $waveforms, private ?UserProvider $users, private Dispatcher $bus, private Events $events, private MediaAuthorizer $access) {}
 
     public function request(Authenticatable $actor, RequestWaveform $command): WaveformTask
     {
@@ -35,6 +36,9 @@ final readonly class WaveformProcessing
             $row = $this->owned($actor, $command->workspaceId, $command->taskId)->lockForUpdate()->firstOrFail();
             if ($row->asset_id !== $command->assetId || (int) $row->frames_per_peak !== $command->framesPerPeak || ! hash_equals($row->source_sha256, $asset->metadata['sha256'])) {
                 throw new UploadConflict('This waveform task identifier belongs to another request.');
+            }
+            if ($row->status === 'cancelled') {
+                return $this->task($row);
             }
             if ($row->status !== 'ready' || $this->waveforms->get($actor, $command->workspaceId, $command->assetId, $command->framesPerPeak) === null) {
                 $changed = $inserted === 1 || $row->status !== 'queued';
@@ -55,7 +59,7 @@ final readonly class WaveformProcessing
     public function get(Authenticatable $actor, string $workspaceId, string $taskId): WaveformTask
     {
         $row = $this->owned($actor, $workspaceId, $taskId)->firstOrFail();
-        $this->uploads->get($actor, $workspaceId, $row->asset_id);
+        $this->access->authorize($actor, $workspaceId, $row->asset_id, 'read');
 
         return $this->task($row);
     }
@@ -67,10 +71,36 @@ final readonly class WaveformProcessing
         return $task->status === 'ready' ? $this->waveforms->get($actor, $workspaceId, $task->assetId, $task->framesPerPeak) : null;
     }
 
+    public function cancel(Authenticatable $actor, string $workspaceId, string $taskId): WaveformTask
+    {
+        return $this->database->transaction(function () use ($actor, $workspaceId, $taskId): WaveformTask {
+            $row = $this->owned($actor, $workspaceId, $taskId)->lockForUpdate()->firstOrFail();
+            $this->access->authorize($actor, $workspaceId, $row->asset_id, 'read');
+            if ($row->status === 'cancelled') {
+                return $this->task($row);
+            }
+            if ($row->status !== 'queued') {
+                throw new UploadConflict('Only queued or in-flight waveform tasks can be cancelled.');
+            }
+            $updated = $this->owned($actor, $workspaceId, $taskId)->where('status', 'queued')->update(['status' => 'cancelled', 'updated_at' => now('UTC')]);
+            if ($updated !== 1) {
+                throw new UploadConflict('The waveform task changed during cancellation.');
+            }
+            $row->status = 'cancelled';
+            $task = $this->task($row);
+            $this->events->dispatch(new WaveformTaskChanged($task));
+
+            return $task;
+        }, 3);
+    }
+
     /** Queue worker boundary: resolves the canonical user and rechecks live asset permission. */
     public function process(string $taskId): void
     {
         $row = $this->database->table('music_media_waveform_tasks')->where('id', $taskId)->firstOrFail();
+        if ($row->status === 'cancelled') {
+            return;
+        }
         $actor = $this->users?->retrieveById($row->actor_id);
         if ($actor === null) {
             throw new AuthorizationException('The waveform requester is unavailable.');
@@ -80,7 +110,7 @@ final readonly class WaveformProcessing
             throw new UploadConflict('The waveform task source changed.');
         }
         $this->database->transaction(function () use ($row): void {
-            $updated = $this->database->table('music_media_waveform_tasks')->where('id', $row->id)->where('status', '!=', 'ready')->update(['status' => 'ready', 'updated_at' => now()]);
+            $updated = $this->database->table('music_media_waveform_tasks')->where('id', $row->id)->whereIn('status', ['queued', 'failed'])->update(['status' => 'ready', 'updated_at' => now()]);
             if ($updated === 1) {
                 $row->status = 'ready';
                 $this->events->dispatch(new WaveformTaskChanged($this->task($row)));

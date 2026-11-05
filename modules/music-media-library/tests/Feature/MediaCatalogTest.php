@@ -15,6 +15,7 @@ use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Foundation\Search\Registry\SearcherRegistry;
 use Liberu\Foundation\Search\SearchServiceProvider;
 use Liberu\Foundation\Search\Services\SearchService;
+use Liberu\Music\MediaLibrary\Commands\BrowseAssets;
 use Liberu\Music\MediaLibrary\Commands\SearchAssets;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Commands\UpdateAssetMetadata;
@@ -187,4 +188,35 @@ it('backfills Unicode search names when upgrading existing uploaded assets', fun
     $this->artisan('migrate', ['--path' => realpath(__DIR__.'/../../database/migrations'), '--realpath' => true])->assertSuccessful();
     expect(DB::table('music_media_uploads')->where('id', $asset->id)->value('search_name'))->toBe('électric old recording')
         ->and($this->catalog->search($this->actor, new SearchAssets('studio', query: 'électric'))->items()[0]->id)->toBe($asset->id);
+});
+
+it('browses authorized catalog entries by stable keyset with bounded queries', function () {
+    $ids = [($this->publish)()->id];
+    for ($i = 0; $i < 2; $i++) {
+        $id = (string) Str::uuid();
+        $this->uploads->start($this->actor, new StartUpload('studio', $id, 'Extra', strlen($this->bytes), hash('sha256', $this->bytes), []));
+        $this->uploads->append($this->actor, 'studio', $id, 0, $this->bytes);
+        $this->uploads->complete($this->actor, 'studio', $id);
+        $ids[] = $id;
+    }
+    rsort($ids);
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+    $first = $this->catalog->browse($this->actor, new BrowseAssets('studio', limit: 1));
+    expect(DB::getQueryLog())->toHaveCount(1)->and($first->items[0]->id)->toBe($ids[0])->and($first->nextAssetId)->toBe($ids[0]);
+    DB::disableQueryLog();
+    $rest = $this->catalog->browse($this->actor, new BrowseAssets('studio', limit: 2, beforeAssetId: $first->nextAssetId));
+    expect(array_column($rest->items, 'id'))->toBe(array_slice($ids, 1))->and($rest->nextAssetId)->toBeNull()->and($rest->jsonSerialize()['schema_version'])->toBe(1);
+    expect($this->catalog->browse($this->actor, new BrowseAssets('studio', query: 'not present'))->items)->toBe([]);
+    expect(fn () => new BrowseAssets('studio', beforeAssetId: 'bad'))->toThrow(ValidationException::class);
+});
+
+it('keeps cursor pages workspace scoped and rechecks list and asset permissions', function () {
+    $asset = ($this->publish)('Studio take');
+    ($this->publish)('Other take', 'other');
+    $page = $this->catalog->browse($this->actor, new BrowseAssets('studio'));
+    expect(array_column($page->items, 'id'))->toBe([$asset->id]);
+    expect(fn () => $this->catalog->browse(new GenericUser(['id' => 2]), new BrowseAssets('studio')))->toThrow(AuthorizationException::class);
+    app(Gate::class)->define('music.media.read', fn () => false);
+    expect(fn () => $this->catalog->browse($this->actor, new BrowseAssets('studio')))->toThrow(AuthorizationException::class);
 });
