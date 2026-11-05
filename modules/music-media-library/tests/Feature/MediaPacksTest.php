@@ -18,6 +18,7 @@ use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Data\MediaPack;
 use Liberu\Music\MediaLibrary\Events\MediaPackSaved;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
+use Liberu\Music\MediaLibrary\Exceptions\MetadataCommandConflict;
 use Liberu\Music\MediaLibrary\Exceptions\MetadataConflict;
 use Liberu\Music\MediaLibrary\Services\MediaPacks;
 use Liberu\Music\MediaLibrary\Services\MediaRetention;
@@ -99,7 +100,7 @@ it('replays the exact revision without overwriting newer membership or emitting 
         ->and(DB::table('music_media_pack_revisions')->count())->toBe(2)->and($this->events)->toHaveCount(2)
         ->and(DB::table('music_media_retention')->count())->toBe(2)
         ->and($this->packs->get($this->actor, 'studio', $this->packId)->assets[0]['reference']['id'])->toBe($second);
-    expect(fn () => $this->packs->save($this->actor, ($this->command)([$second])))->toThrow(MetadataConflict::class, 'command key');
+    expect(fn () => $this->packs->save($this->actor, ($this->command)([$second])))->toThrow(MetadataCommandConflict::class, 'command key');
     expect(fn () => $this->packs->save($this->actor, ($this->command)([$first], 1, 'stale')))->toThrow(MetadataConflict::class, 'changed');
     app(Gate::class)->define('music.media.read', fn () => false);
     expect(fn () => $this->packs->save($this->actor, $command))->toThrow(AuthorizationException::class);

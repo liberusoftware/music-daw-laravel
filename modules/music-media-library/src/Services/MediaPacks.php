@@ -23,6 +23,7 @@ use Liberu\Music\MediaLibrary\Data\MediaPackRevision;
 use Liberu\Music\MediaLibrary\Data\ReadyAsset;
 use Liberu\Music\MediaLibrary\Events\MediaPackSaved;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
+use Liberu\Music\MediaLibrary\Exceptions\MetadataCommandConflict;
 use Liberu\Music\MediaLibrary\Exceptions\MetadataConflict;
 
 final readonly class MediaPacks
@@ -45,7 +46,7 @@ final readonly class MediaPacks
             $previous = $this->revisions($command->workspaceId, $command->packId)->where('command_hash', hash('sha256', $command->commandKey))->first();
             if ($previous !== null) {
                 if (! hash_equals($fingerprint, $previous->fingerprint)) {
-                    throw new MetadataConflict('The pack command key already belongs to another operation.');
+                    throw new MetadataCommandConflict('The pack command key already belongs to another operation.');
                 }
                 $pack = $this->revision($previous);
                 $this->authorizeSnapshot($actor, $pack);
