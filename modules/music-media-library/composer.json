@@ -1,6 +1,6 @@
 {
   "name": "liberusoftware/music-media-library",
-  "description": "Verified Music audio, queued publication and trash recovery, rights packs and reference-safe cleanup.",
+  "description": "Verified Music audio, durable private archive exports, queued recovery, rights packs and safe cleanup.",
   "type": "liberu-module",
   "license": "MIT",
   "version": "0.1.0",

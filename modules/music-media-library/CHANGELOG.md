@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add durable canonical-requester pack ZIP export tasks, private checksum-verified results, expiry and bounded operator cleanup.
+- Serialize export publication/cancellation and retain task-owned private staging for safe retry after interrupted acknowledgement.
+
 - Add durable owned queued trash recovery with live worker policies, safe failure/retry outcomes and serialized cancellation/publication.
 
 - Add a typed offline pin version conflict while preserving UploadConflict parent compatibility.
