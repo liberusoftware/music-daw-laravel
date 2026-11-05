@@ -135,3 +135,75 @@ jobs:
         with:
           name: projects-livewire-coverage
           path: modules/music-projects-livewire/coverage/livewire.xml
+
+  music-projects-livewire-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_ENV: testing
+      APP_DEBUG: 'false'
+      APP_KEY: base64:3xVFJ5tTr05dWL1gsJqF+UvWdv3X0Cz/CBaUG47hb3U=
+      APP_URL: http://127.0.0.1:8743
+      DB_CONNECTION: sqlite
+      DB_DATABASE: ${{ runner.temp }}/music-livewire-browser.sqlite
+      DB_URL: ''
+      CACHE_STORE: array
+      SESSION_DRIVER: database
+      SESSION_CONNECTION: sqlite
+      SESSION_DOMAIN: 'null'
+      SESSION_SECURE_COOKIE: 'false'
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+      BCRYPT_ROUNDS: '4'
+      MODULES_ENABLED: music-projects-livewire
+      MUSIC_BROWSER_URL: http://127.0.0.1:8743
+      MUSIC_BROWSER_EMAIL: browser-musician@example.test
+      MUSIC_BROWSER_PASSWORD: Browser-Test-Password-42!
+      MUSIC_BROWSER_OUTPUT: ${{ runner.temp }}/music-browser-artifacts
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/music-browser-binaries
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: bcmath, gd, intl, mbstring, pdo_sqlite, zip
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: touch "$DB_DATABASE"
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: npm ci
+      - run: npm run build
+      - run: npm ci --ignore-scripts --prefix modules/music-projects-livewire
+      - run: modules/music-projects-livewire/node_modules/.bin/playwright install --with-deps chromium
+      - run: php artisan migrate --force
+      - name: Seed disposable browser identity and workspace
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          code = r"""
+          require 'vendor/autoload.php';
+          $app = require 'bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          $user = App\Models\User::factory()->create(['name' => 'Browser Musician', 'email' => getenv('MUSIC_BROWSER_EMAIL'), 'password' => Illuminate\Support\Facades\Hash::make(getenv('MUSIC_BROWSER_PASSWORD'))]);
+          $team = Liberu\Foundation\Organizations\Models\Team::factory()->create(['user_id' => $user->id, 'name' => 'Browser studio', 'personal_team' => true]);
+          $user->forceFill(['current_team_id' => $team->id])->save();
+          setPermissionsTeamId($team->id);
+          $role = Spatie\Permission\Models\Role::firstOrCreate(['name' => config('filament-shield.super_admin.name', 'super_admin'), 'guard_name' => 'web', 'team_id' => $team->id]);
+          $user->assignRole($role);
+          file_put_contents(getenv('GITHUB_ENV'), 'MUSIC_BROWSER_WORKSPACE='.$team->id.PHP_EOL, FILE_APPEND);
+          """
+          subprocess.run(['php', '-r', code], check=True)
+          PY
+      - name: Start disposable web host
+        run: php artisan serve --host=127.0.0.1 --port=8743 --no-reload > "$RUNNER_TEMP/music-browser-server.log" 2>&1 &
+      - run: curl --retry 30 --retry-connrefused --retry-delay 1 --silent --fail "$MUSIC_BROWSER_URL/login" > /dev/null
+      - run: npm --prefix modules/music-projects-livewire run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: projects-livewire-browser
+          path: |
+            ${{ runner.temp }}/music-browser-artifacts
+            ${{ runner.temp }}/music-browser-server.log

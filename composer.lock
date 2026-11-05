@@ -7001,7 +7001,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-projects-livewire",
-                "reference": "1321568d587bb97308d9b3e0821a18c668dd37a0"
+                "reference": "2b4e95ce339c5a2851f70036b21569a21af1824b"
             },
             "require": {
                 "illuminate/routing": "^13.38",
@@ -7009,7 +7009,8 @@
                 "illuminate/validation": "^13.38",
                 "liberusoftware/music-projects": "^0.1 || dev-main",
                 "livewire/livewire": "^4.4",
-                "php": "^8.5"
+                "php": "^8.5",
+                "php-64bit": "^8.5"
             },
             "require-dev": {
                 "liberusoftware/package-testbench": "^1.8",

@@ -116,15 +116,16 @@ it('rejects invalid cross-workspace and oversized draft backups before changing 
         'version' => 0, 'template' => false, 'title' => 'Wrong workspace', 'document' => $component->get('document'), 'command_key' => $component->get('commandKey')];
     $component->call('restoreDraft', json_encode($draft))->assertHasErrors('draft.workspace_id')->assertSet('title', 'Protected');
     $component->call('restoreDraft', '{')->assertSee('not valid JSON')->call('restoreDraft', '{}')->assertHasErrors()
-        ->call('restoreDraft', str_repeat(' ', 17 * 1024 * 1024 + 1))->assertHasErrors('draft')->assertSet('title', 'Protected');
+        ->call('restoreDraft', str_repeat(' ', 64 * 1024 * 1024 + 1))->assertHasErrors('draft')->assertSet('title', 'Protected');
 });
 
 it('locks identity revision and replay state against browser property tampering', function ($property, $value) {
     expect(fn () => ($this->workspace)()->set($property, $value))->toThrow(CannotUpdateLockedPropertyException::class);
-})->with([['workspaceId', 'other'], ['projectId', 'forged'], ['version', 99], ['commandKey', 'forged'], ['reviewedManifest', 'forged']]);
+})->with([['workspaceId', 'other'], ['projectId', 'forged'], ['version', 99], ['commandKey', 'forged'], ['reviewedManifest', 'forged'], ['preservedAssetsJson', 'forged'], ['preservedModulesJson', 'forged']]);
 
 it('renders the full page route and redirects guests to the hosts login', function () {
-    $this->get('/music/workspaces/studio/sessions')->assertSuccessful()->assertSee('Sessions · Music')->assertSee('Save checkpoint');
+    $response = $this->get('/music/workspaces/studio/sessions')->assertSuccessful()->assertSee('Sessions · Music')->assertSee('Save checkpoint');
+    expect($response->headers->get('Cache-Control'))->toContain('no-store', 'private');
     auth()->forgetGuards();
     Route::get('/login', fn () => 'Login')->name('login');
     app('router')->getRoutes()->refreshNameLookups();
@@ -160,4 +161,26 @@ it('moves and removes draft tracks through core graph validation without droppin
     Gate::define('music.projects.write', fn () => false);
     $component->call('removeTrack', $childId)->assertSee('Access denied');
     expect($component->get('document')['tracks'])->toHaveCount(1);
+});
+
+it('preserves opaque 64-bit state in version two backups and recovers legacy blocks from their saved base', function () {
+    $id = (string) Str::uuid();
+    $input = SessionDocument::empty()->jsonSerialize();
+    $input['modules'] = ['unavailable-instrument' => ['schema_version' => 7, 'state' => ['identifier' => PHP_INT_MAX]]];
+    app(ProjectSessions::class)->save($this->actor, new SaveSession('studio', $id, 'Opaque state', SessionDocument::fromArray($input), 0, 'initial'));
+    $component = ($this->workspace)($id);
+    $draft = ['format' => 'liberu.music.draft', 'schema_version' => 2, 'workspace_id' => 'studio', 'project_id' => $id,
+        'version' => 1, 'template' => false, 'title' => 'Restored state', 'document' => SessionDocument::empty()->jsonSerialize(),
+        'command_key' => $component->get('commandKey'), 'assets_json' => '[]', 'modules_json' => $component->get('preservedModulesJson')];
+    $component->call('newSession')->call('restoreDraft', json_encode($draft))->call('save')->assertSet('version', 2);
+    expect(app(ProjectSessions::class)->get($this->actor, 'studio', $id)->document->jsonSerialize()['modules'])->toBe($input['modules']);
+    $draft['schema_version'] = 1;
+    unset($draft['assets_json'], $draft['modules_json']);
+    $component->call('restoreDraft', json_encode($draft));
+    expect($component->get('document')['modules'])->toBe($input['modules']);
+    $draft['schema_version'] = 2;
+    $component->call('restoreDraft', json_encode($draft))->assertHasErrors('draft.assets_json');
+    $draft['assets_json'] = '[]';
+    $draft['modules_json'] = '{';
+    $component->call('restoreDraft', json_encode($draft))->assertSee('not valid JSON');
 });

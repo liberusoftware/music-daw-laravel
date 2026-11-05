@@ -51,6 +51,12 @@ final class SessionWorkspace extends Component
 
     public array $document = [];
 
+    #[Locked]
+    public ?string $preservedAssetsJson = null;
+
+    #[Locked]
+    public ?string $preservedModulesJson = null;
+
     public string $trackName = '';
 
     public string $trackKind = 'audio';
@@ -167,7 +173,7 @@ final class SessionWorkspace extends Component
     {
         $this->attempt(function ($actor) use ($autosave): void {
             $revision = app(ProjectSessions::class)->save($actor, new SaveSession($this->workspaceId, $this->projectId, $this->title,
-                SessionDocument::fromArray($this->document), $this->version, $this->commandKey.($autosave ? ':autosave' : ':checkpoint'), $autosave, $this->template));
+                $this->documentForSave(), $this->version, $this->commandKey.($autosave ? ':autosave' : ':checkpoint'), $autosave, $this->template));
             $this->accept($revision);
             $this->notice = $autosave ? 'Autosave confirmed by the server.' : 'Checkpoint confirmed by the server.';
         });
@@ -261,26 +267,40 @@ final class SessionWorkspace extends Component
     public function restoreDraft(string $json): void
     {
         $this->attempt(function ($actor) use ($json): void {
-            if (strlen($json) > 17 * 1024 * 1024) {
-                throw ValidationException::withMessages(['draft' => 'Draft backups may not exceed 17 MiB.']);
+            if (strlen($json) > 64 * 1024 * 1024) {
+                throw ValidationException::withMessages(['draft' => 'Draft backups may not exceed 64 MiB.']);
             }
             $draft = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
-            $input = Validator::make(['draft' => $draft], ['draft' => ['required', 'array:format,schema_version,workspace_id,project_id,version,template,title,document,command_key'],
-                'draft.format' => ['required', 'in:liberu.music.draft'], 'draft.schema_version' => ['required', 'integer:strict', 'in:1'],
+            $input = Validator::make(['draft' => $draft], ['draft' => ['required', 'array:format,schema_version,workspace_id,project_id,version,template,title,document,command_key,assets_json,modules_json'],
+                'draft.format' => ['required', 'in:liberu.music.draft'], 'draft.schema_version' => ['required', 'integer:strict', 'in:1,2'],
                 'draft.workspace_id' => ['required', 'in:'.$this->workspaceId], 'draft.project_id' => ['required', 'uuid'],
                 'draft.version' => ['required', 'integer:strict', 'min:0'], 'draft.template' => ['required', 'boolean:strict'],
+                'draft.assets_json' => ['required_if:draft.schema_version,2', 'string', 'max:16777216'],
+                'draft.modules_json' => ['required_if:draft.schema_version,2', 'string', 'max:16777216'],
                 'draft.title' => ['required', 'string', 'max:255'], 'draft.document' => ['required', 'array'], 'draft.command_key' => ['required', 'uuid'],
             ])->validate()['draft'];
             app(ProjectAccess::class)->authorize($actor, $this->workspaceId, $input['project_id'], 'write');
-            $document = SessionDocument::fromArray($input['document']);
+            $source = null;
             if ($input['version'] > 0) {
-                app(ProjectSessions::class)->get($actor, $this->workspaceId, $input['project_id']);
+                $source = app(ProjectSessions::class)->get($actor, $this->workspaceId, $input['project_id'], $input['schema_version'] === 1 ? $input['version'] : null);
             }
+            $candidate = $input['document'];
+            if ($input['schema_version'] === 2) {
+                $candidate['assets'] = json_decode($input['assets_json'], true, flags: JSON_THROW_ON_ERROR);
+                $candidate['modules'] = json_decode($input['modules_json'], true, flags: JSON_THROW_ON_ERROR);
+            } elseif ($source !== null) {
+                // Legacy browser backups serialized unknown numeric state through JS.
+                // Recover these read-only blocks from their immutable saved base.
+                $candidate['assets'] = $source->document->assets();
+                $candidate['modules'] = $source->document->jsonSerialize()['modules'];
+            }
+            $document = SessionDocument::fromArray($candidate);
             $this->projectId = $input['project_id'];
             $this->version = $input['version'];
             $this->template = $input['template'];
             $this->title = $input['title'];
             $this->document = $document->jsonSerialize();
+            $this->preserveBlocks($document);
             $this->commandKey = $input['command_key'];
             $this->resetEditingContext();
             $this->notice = 'Draft restored without saving or rebasing. Save explicitly; newer server revisions will require reconciliation.';
@@ -321,6 +341,7 @@ final class SessionWorkspace extends Component
         $this->version = 0;
         $this->template = false;
         $this->document = SessionDocument::empty()->jsonSerialize();
+        $this->preservedAssetsJson = $this->preservedModulesJson = null;
         $this->resetEditingContext();
     }
 
@@ -329,10 +350,30 @@ final class SessionWorkspace extends Component
         $this->projectId = $revision->projectId;
         $this->title = $revision->title;
         $this->document = $revision->document->jsonSerialize();
+        $this->preserveBlocks($revision->document);
         $this->version = $revision->version;
         $this->template = $revision->template;
         $this->commandKey = (string) Str::uuid();
         $this->resetEditingContext();
+    }
+
+    private function preserveBlocks(SessionDocument $document): void
+    {
+        $this->preservedAssetsJson = json_encode($document->assets(), JSON_THROW_ON_ERROR);
+        $this->preservedModulesJson = json_encode($document->jsonSerialize()['modules'], JSON_THROW_ON_ERROR);
+    }
+
+    private function documentForSave(): SessionDocument
+    {
+        $document = $this->document;
+        if ($this->preservedAssetsJson !== null) {
+            $document['assets'] = json_decode($this->preservedAssetsJson, true, flags: JSON_THROW_ON_ERROR);
+        }
+        if ($this->preservedModulesJson !== null) {
+            $document['modules'] = json_decode($this->preservedModulesJson, true, flags: JSON_THROW_ON_ERROR);
+        }
+
+        return SessionDocument::fromArray($document);
     }
 
     private function resetEditingContext(): void
