@@ -57,6 +57,7 @@ final readonly class MediaRetention
         // Duplicate catalog entries can share one content-addressed object. A pin
         // on any of them protects those bytes without disclosing reference IDs.
         return $this->database->table('music_media_retention as pins')->join('music_media_uploads as assets', 'assets.id', '=', 'pins.asset_id')
-            ->where('pins.workspace_id', $workspaceId)->where('assets.workspace_id', $workspaceId)->where('assets.sha256', $asset->sha256)->exists();
+            ->where('pins.workspace_id', $workspaceId)->where('assets.workspace_id', $workspaceId)->where('assets.sha256', $asset->sha256)
+            ->where(fn ($query) => $query->whereNull('pins.expires_at')->orWhere('pins.expires_at', '>', now('UTC')))->exists();
     }
 }

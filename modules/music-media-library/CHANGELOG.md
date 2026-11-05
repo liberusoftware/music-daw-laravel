@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add owner-scoped offline asset sets with optimistic versions, replay-safe renewal/release, explicit UTC leases and commit-bound events.
+
 - Retain session media references in the revision transaction; fail closed when retention cannot participate.
 
 - Add bounded streaming WAVE metadata and checksum verification.

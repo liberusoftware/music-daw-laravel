@@ -14,10 +14,13 @@ use Illuminate\Validation\ValidationException;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Foundation\Files\Contracts\MediaAccess;
 use Liberu\Music\MediaLibrary\Commands\RestoreAsset;
+use Liberu\Music\MediaLibrary\Commands\SaveOfflinePin;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
+use Liberu\Music\MediaLibrary\Services\MediaRetention;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
+use Liberu\Music\MediaLibrary\Services\OfflinePins;
 use Liberu\Music\Projects\Commands\SaveSession;
 use Liberu\Music\Projects\Contracts\VerifiedMedia;
 use Liberu\Music\Projects\Data\SessionDocument;
@@ -38,7 +41,7 @@ it('saves, recovers and reopens portable sessions using actual verified uploaded
     $disk = Storage::fake('music-session-integration');
     $actor = User::factory()->create();
     $other = User::factory()->create();
-    foreach (['music.projects.write', 'music.projects.read', 'music.media.upload', 'music.media.read', 'music.media.retain'] as $ability) {
+    foreach (['music.projects.write', 'music.projects.read', 'music.media.upload', 'music.media.read', 'music.media.retain', 'music.media.pin'] as $ability) {
         Gate::define($ability, fn ($user, $workspace) => $user->getKey() === $actor->getKey() && in_array($workspace, ['studio', 'other']));
     }
     $scanner = Mockery::mock(MalwareScanner::class);
@@ -88,6 +91,17 @@ it('saves, recovers and reopens portable sessions using actual verified uploaded
     expect($recovered->autosave)->toBeFalse()->and($recovered->version)->toBe(3)
         ->and($reopened->document->jsonSerialize())->toBe($document->jsonSerialize())
         ->and($sessions->get($actor, 'studio', $projectId)->document->assets())->toBe([$asset->reference()]);
+    $offline = app(OfflinePins::class);
+    $pinId = (string) Str::uuid();
+    $pinCommand = new SaveOfflinePin('studio', $pinId, [$mediaId], 0, 'pin');
+    $offline->save($actor, $pinCommand);
+    expect(DB::table('music_media_retention')->count())->toBe(5);
+    $offline->save($actor, new SaveOfflinePin('studio', $pinId, [], 1, 'release'));
+    $offline->save($actor, $pinCommand);
+    expect(DB::table('music_media_retention')->count())->toBe(4)
+        ->and(app(MediaRetention::class)->isProtected($actor, 'studio', $mediaId))->toBeTrue()
+        ->and($sessions->get($actor, 'studio', $projectId)->document->assets())->toBe([$asset->reference()]);
+    expect(fn () => $offline->get($other, 'studio', $pinId))->toThrow(AuthorizationException::class);
     expect(fn () => $sessions->save($other, $command))->toThrow(AuthorizationException::class);
     expect(fn () => $sessions->save($actor, new SaveSession('other', (string) Str::uuid(), 'Cross workspace', $document, 0, 'cross')))->toThrow(RecordNotFoundException::class);
     $tampered = $input;
