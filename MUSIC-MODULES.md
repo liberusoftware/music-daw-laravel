@@ -1,6 +1,6 @@
 # Music module repositories
 
-Status: under development. Projects core, Media Library core and the optional Projects API for metadata and conditional checkpoint/recovery/import commands are installed from modules/ and synchronized to their separate repositories. The API is disabled by default and scoped reconnect polling is implemented, while continuous push and remaining operational scope are unfinished. Other Music packages remain planned. Track acceptance and remaining work in the [delivery roadmap](https://github.com/liberusoftware/project-music-daw-laravel-filament/issues/94); no complete DAW release is claimed.
+Status: under development. Projects core, Media Library core and their optional APIs are installed from modules/ and synchronized to separate repositories. APIs are disabled by default. Projects provides metadata, conditional checkpoint/recovery/import commands and scoped revision polling. Media Library API provides verified metadata, keyset browsing, budget views and cancellable waveform jobs; transfer/edit/pack/lifecycle HTTP workflows remain unfinished. Other Music packages remain planned. Track acceptance and remaining work in the [delivery roadmap](https://github.com/liberusoftware/project-music-daw-laravel-filament/issues/94); no complete DAW release is claimed.
 
 22 documented capabilities × core, API, Livewire and Filament = 88 repositories.
 

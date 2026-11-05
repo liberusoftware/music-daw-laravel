@@ -1,0 +1,1374 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Music Media Library API",
+    "version": "0.1.0",
+    "description": "Initial read and waveform-task contract. Abilities: music.media.read for queries, music.media.process plus read for task mutation, music.media.quota.read for budgets. Binary transfer, upload verification, edits, packs and lifecycle HTTP operations are explicitly unsupported in this increment. No native audio/device execution.",
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "The current host; the module is disabled unless explicitly enabled."
+    }
+  ],
+  "tags": [
+    {
+      "name": "Media",
+      "description": "Authorized verified assets and owned waveform jobs."
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/v1/music-media/workspaces/{workspace}/capabilities": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "mediaCapabilities",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Discover supported Media Library operations",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Capabilities"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/assets": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "mediaBrowse",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Browse verified assets by descending UUID keyset",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Asset"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "parameters": [
+          {
+            "name": "filter[query]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "filter[tags]",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "string",
+                "maxLength": 64
+              }
+            }
+          },
+          {
+            "name": "filter[sha256]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          {
+            "name": "page[size]",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "page[after]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "description": "Encrypted, expiring cursor bound to actor, workspace, filters and page size."
+          }
+        ]
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/assets/{asset}": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "asset",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "mediaShow",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Read current verified asset metadata and availability",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Asset"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/upload-budget": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "mediaBudget",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Read a workspace logical upload reservation budget",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Budget"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/waveform-tasks/{task}": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "mediaTask",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Read an owned task and coarse progress",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Task"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      },
+      "put": {
+        "operationId": "mediaRequestWaveform",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Request or replay an owned waveform task",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Task"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "202": {
+            "description": "Queued task; follow status/result links. Cancellation never reopens a task.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Task"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Must equal the stable task UUID in the path. Changed task arguments conflict."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "asset_id"
+                ],
+                "properties": {
+                  "asset_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "sample_frames_per_peak": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1048576,
+                    "default": 1024
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "mediaCancelWaveform",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Cancel a queued or in-flight owned task",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Task"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Must equal the task UUID. Cancellation replay is idempotent."
+          }
+        ]
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/waveform-tasks/{task}/result": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "mediaWaveformResult",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Read derived peaks without synchronous indexing",
+        "description": "Requires a Sanctum token with the documented operation ability and current workspace/asset policy approval.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Waveform"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "202": {
+            "description": "Still queued; Retry-After is supplied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Task"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Ready result was evicted; replay the original PUT to regenerate it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Sanctum token"
+      }
+    },
+    "schemas": {
+      "Problem": {
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id",
+          "errors"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pointer": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Audio": {
+        "type": "object",
+        "required": [
+          "sha256",
+          "bytes",
+          "sample_rate",
+          "channels",
+          "frames"
+        ],
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 44,
+            "description": "Verified WAVE object bytes."
+          },
+          "sample_rate": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Sample frames per second (Hz)."
+          },
+          "channels": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "frames": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Total sample frames."
+          }
+        }
+      },
+      "Asset": {
+        "type": "object",
+        "required": [
+          "id",
+          "workspace_id",
+          "name",
+          "audio",
+          "provenance",
+          "duplicate_of"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspace_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "audio": {
+            "$ref": "#/components/schemas/Audio"
+          },
+          "provenance": {
+            "type": "object"
+          },
+          "duplicate_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "available": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Task": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "workspace_id",
+          "asset_id",
+          "requested_sample_frames_per_peak",
+          "status",
+          "terminal",
+          "cancellable",
+          "progress"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspace_id": {
+            "type": "string"
+          },
+          "asset_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requested_sample_frames_per_peak": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "ready",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "terminal": {
+            "type": "boolean"
+          },
+          "cancellable": {
+            "type": "boolean"
+          },
+          "progress": {
+            "type": "object",
+            "required": [
+              "completed_steps",
+              "total_steps",
+              "unit"
+            ],
+            "properties": {
+              "completed_steps": {
+                "type": "integer",
+                "enum": [
+                  0,
+                  1
+                ]
+              },
+              "total_steps": {
+                "type": "integer",
+                "const": 1
+              },
+              "unit": {
+                "type": "string",
+                "const": "waveform_build"
+              }
+            }
+          }
+        }
+      },
+      "Waveform": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "source_sha256",
+          "sample_rate",
+          "channels",
+          "sample_frames",
+          "sample_frames_per_peak",
+          "peaks"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "source_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "sample_rate": {
+            "type": "integer"
+          },
+          "channels": {
+            "type": "integer"
+          },
+          "channel_mask": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sample_frames": {
+            "type": "integer"
+          },
+          "sample_frames_per_peak": {
+            "type": "integer"
+          },
+          "peaks": {
+            "type": "array",
+            "maxItems": 16384,
+            "items": {
+              "type": "object",
+              "required": [
+                "start_sample_frame",
+                "end_sample_frame",
+                "channels"
+              ],
+              "properties": {
+                "start_sample_frame": {
+                  "type": "integer"
+                },
+                "end_sample_frame": {
+                  "type": "integer"
+                },
+                "channels": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "minimum",
+                      "maximum"
+                    ],
+                    "properties": {
+                      "minimum": {
+                        "type": "number"
+                      },
+                      "maximum": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Budget": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "workspace_id",
+          "reserved_bytes",
+          "limit_bytes",
+          "available_bytes",
+          "over_limit",
+          "reservation_multiplier"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "workspace_id": {
+            "type": "string"
+          },
+          "reserved_bytes": {
+            "type": "integer"
+          },
+          "limit_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "available_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "over_limit": {
+            "type": "boolean"
+          },
+          "reservation_multiplier": {
+            "type": "integer",
+            "const": 2
+          }
+        }
+      },
+      "Capabilities": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "operations",
+          "unsupported"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unsupported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "Problem": {
+        "description": "Problem response with status, structured errors and correlation ID; private implementation details are redacted.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      }
+    }
+  }
+}

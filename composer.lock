@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e73a84a3714a0e5d0975308317909c40",
+    "content-hash": "2b3d4a272f68d3945dd27794b8cdb220",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -6820,6 +6820,63 @@
                 "MIT"
             ],
             "description": "Verified Music audio, reviewed packs, upload budgets, queued waveforms and recoverable reference-safe asset cleanup.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "liberusoftware/music-media-library-api",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "modules/music-media-library-api",
+                "reference": "9a95617412b03144e66efebbeff7616d7ae07c19"
+            },
+            "require": {
+                "illuminate/encryption": "^13.38",
+                "illuminate/http": "^13.38",
+                "illuminate/routing": "^13.38",
+                "illuminate/validation": "^13.38",
+                "laravel/sanctum": "^4.3",
+                "liberusoftware/music-media-library": "^0.1 || dev-main",
+                "php": "^8.5"
+            },
+            "require-dev": {
+                "liberusoftware/package-testbench": "^1.8",
+                "pestphp/pest": "^5.3"
+            },
+            "type": "liberu-module",
+            "extra": {
+                "liberu": {
+                    "name": "music-media-library-api"
+                },
+                "laravel": {
+                    "providers": []
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Liberu\\Music\\MediaLibraryApi\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Liberu\\Music\\MediaLibraryApi\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ],
+                "test:coverage": [
+                    "pest --coverage --min=100"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Authorized Music asset metadata, keyset browsing, upload budgets and cancellable waveform jobs.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

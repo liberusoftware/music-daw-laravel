@@ -89,3 +89,28 @@ jobs:
         with:
           name: projects-api-coverage
           path: modules/music-projects-api/coverage/api.xml
+
+  music-media-library-api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/music-media-library-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: intl, mbstring, pdo_sqlite, zip
+          coverage: pcov
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npx --yes @redocly/cli@2.15.0 lint openapi/media.json
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: vendor/bin/phpstan analyse src --level=5 --no-progress --memory-limit=512M
+      - run: composer test:coverage -- --coverage-clover=coverage/api.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: media-api-coverage
+          path: modules/music-media-library-api/coverage/api.xml

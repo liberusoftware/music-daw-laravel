@@ -10,7 +10,7 @@
 
 Liberu Music is the Laravel host skeleton for a proposed modular Digital Audio Workstation for songwriters, musicians, producers, composers and mix engineers. It starts from [Liberu Boilerplate](https://github.com/liberusoftware/project-boilerplate-laravel-filament/tree/95f445a2901f2296959bec24229c6a1d5d5a6815), preserving its application structure and shared foundation modules and themes.
 
-**Status: under development.** Projects core, Media Library core and the optional Projects API are installed from `modules/`, with independently tested implementations synchronized to their separate repositories. The API must be explicitly enabled; checkpoint/recovery/import commands and scoped revision polling are implemented, while continuous push delivery and remaining operational scope are unfinished. The remaining Music packages and the complete DAW are unfinished. No native audio engine, physical recording support or Music UI is provided yet. See the [delivery roadmap](https://github.com/liberusoftware/project-music-daw-laravel-filament/issues/94) for acceptance tracking.
+**Status: under development.** Projects core, Media Library core and their optional API adapters are installed from `modules/`, with independently tested implementations synchronized to separate repositories. APIs require explicit enablement. Projects provides checkpoint/recovery/import commands and scoped revision polling; Media Library provides authorized metadata, keyset browsing, upload reservation views and cancellable waveform jobs. Media transfer/edit/pack/lifecycle HTTP operations, remaining Music packages and the complete DAW are unfinished. No native audio engine, physical recording support or Music UI is provided yet. See the [delivery roadmap](https://github.com/liberusoftware/project-music-daw-laravel-filament/issues/94) for acceptance tracking.
 
 ## Planned product capabilities
 
@@ -98,7 +98,7 @@ npm run build
 
 The host suite includes Music composition tests. Each implemented Music package also runs independently through the Liberu package testbench and enforces 100% source line coverage. Host coverage includes `modules/*/src` and currently remains below its required 100% gate. These tests do not establish native engine or physical-device support.
 
-Active install and coverage checks are published under `.github/workflows/` in the host and implemented Music repositories. Projects core has passed its standalone install/test workflows. Host installation has passed, while the host-wide 100% coverage gate still fails; passing package checks does not satisfy that gate. The optional [Projects API](modules/music-projects-api/README.md) additionally validates its OpenAPI fragment. Inherited publishing templates require organization secrets and review before activation. No complete Music module release is claimed.
+Active install and coverage checks are published under `.github/workflows/` in the host and implemented Music repositories. Projects core has passed its standalone install/test workflows. Host installation has passed, while the host-wide 100% coverage gate still fails; passing package checks does not satisfy that gate. The optional [Projects API](modules/music-projects-api/README.md) and [Media Library API](modules/music-media-library-api/README.md) also validate their OpenAPI fragments. Inherited publishing templates require organization secrets and review before activation. No complete Music module release is claimed.
 
 ## Documentation and roadmap
 

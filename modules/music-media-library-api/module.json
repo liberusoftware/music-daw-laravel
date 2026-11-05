@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schemas.liberu.dev/module/v1.json",
+  "name": "music-media-library-api",
+  "display_name": "Music Media Library API",
+  "description": "Authorized Music asset metadata, keyset browsing, upload budgets and cancellable waveform jobs.",
+  "version": "0.1.0",
+  "category": "presentation",
+  "provider": "Liberu\\Music\\MediaLibraryApi\\MusicMediaLibraryApiServiceProvider",
+  "requires": {
+    "php": "^8.5",
+    "laravel": "^13.0",
+    "packages": {
+      "liberusoftware/music-media-library": "^0.1 || dev-main"
+    }
+  },
+  "capabilities": [
+    "music.media-library.api"
+  ],
+  "default_enabled": false,
+  "features": [
+    "Authorized verified asset metadata and keyset search",
+    "Scoped upload reservation views",
+    "Owned cancellable waveform task status and cached results"
+  ]
+}
