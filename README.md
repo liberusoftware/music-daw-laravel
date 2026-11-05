@@ -10,7 +10,7 @@
 
 Liberu Music is the Laravel host skeleton for a proposed modular Digital Audio Workstation for songwriters, musicians, producers, composers and mix engineers. It starts from [Liberu Boilerplate](https://github.com/liberusoftware/project-boilerplate-laravel-filament/tree/95f445a2901f2296959bec24229c6a1d5d5a6815), preserving its application structure and shared foundation modules and themes.
 
-**Status: under development.** Projects core, Media Library core and the optional Projects metadata API are installed from `modules/`, with independently tested implementations synchronized to their separate repositories. The API must be explicitly enabled; writes and the rest of its scope remain unfinished. The remaining Music packages and the complete DAW are unfinished. No native audio engine, physical recording support or Music UI is provided yet. See the [delivery roadmap](https://github.com/liberusoftware/project-music-daw-laravel-filament/issues/94) for acceptance tracking.
+**Status: under development.** Projects core, Media Library core and the optional Projects API are installed from `modules/`, with independently tested implementations synchronized to their separate repositories. The API must be explicitly enabled; checkpoint/recovery/import commands are implemented, while revision transport and the rest of its scope remain unfinished. The remaining Music packages and the complete DAW are unfinished. No native audio engine, physical recording support or Music UI is provided yet. See the [delivery roadmap](https://github.com/liberusoftware/project-music-daw-laravel-filament/issues/94) for acceptance tracking.
 
 ## Planned product capabilities
 

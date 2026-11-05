@@ -1,6 +1,6 @@
 {
   "name": "liberusoftware/music-projects-api",
-  "description": "Authorized HTTP metadata and portable import preview adapter for Music Projects.",
+  "description": "Authorized Music session metadata, conditional checkpoints, recovery and portable import API.",
   "type": "liberu-module",
   "license": "MIT",
   "version": "0.1.0",

@@ -2,7 +2,7 @@
   "$schema": "https://schemas.liberu.dev/module/v1.json",
   "name": "music-projects-api",
   "display_name": "Music Projects API",
-  "description": "Authorized HTTP metadata and portable import preview adapter for Music Projects.",
+  "description": "Authorized Music session metadata, conditional checkpoints, recovery and portable import API.",
   "version": "0.1.0",
   "category": "presentation",
   "provider": "Liberu\\Music\\ProjectsApi\\MusicProjectsApiServiceProvider",
@@ -19,6 +19,9 @@
   "default_enabled": false,
   "features": [
     "Authorized session metadata queries",
-    "Portable manifest import preview"
+    "Portable manifest import preview",
+    "Conditional checkpoint and autosave commands",
+    "Replay-safe historical recovery",
+    "Confirmed portable imports"
   ]
 }

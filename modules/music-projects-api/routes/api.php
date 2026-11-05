@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
+use Liberu\Music\ProjectsApi\Http\Controllers\SessionCommandsController;
 use Liberu\Music\ProjectsApi\Http\Controllers\SessionQueriesController;
 use Liberu\Music\ProjectsApi\Http\Middleware\ApiBoundary;
 use Liberu\Music\ProjectsApi\Http\Middleware\RequireProjects;
@@ -14,6 +15,11 @@ Route::prefix('api/v1/music-projects/workspaces/{workspace}')->where(['workspace
             Route::get('/sessions/{project}', [SessionQueriesController::class, 'show'])->whereUuid('project')->name('show');
             Route::get('/sessions/{project}/revisions', [SessionQueriesController::class, 'history'])->whereUuid('project')->name('history');
             Route::get('/sessions/{project}/manifest', [SessionQueriesController::class, 'export'])->whereUuid('project')->name('export');
+        });
+        Route::middleware(CheckAbilities::class.':music.projects.write')->group(function () {
+            Route::post('/sessions/{project}/checkpoints', [SessionCommandsController::class, 'save'])->whereUuid('project')->name('save');
+            Route::post('/sessions/{project}/recoveries', [SessionCommandsController::class, 'recover'])->whereUuid('project')->name('recover');
+            Route::post('/sessions/{project}/imports', [SessionCommandsController::class, 'import'])->whereUuid('project')->name('import');
         });
         Route::post('/sessions/{project}/import-preview', [SessionQueriesController::class, 'preview'])->whereUuid('project')
             ->middleware(CheckAbilities::class.':music.projects.preview')->name('preview');

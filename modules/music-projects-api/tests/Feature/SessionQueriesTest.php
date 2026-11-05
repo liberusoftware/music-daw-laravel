@@ -14,6 +14,7 @@ use Liberu\Music\Projects\Contracts\VerifiedMedia;
 use Liberu\Music\Projects\Data\SessionDocument;
 use Liberu\Music\Projects\MusicProjectsServiceProvider;
 use Liberu\Music\Projects\Services\ProjectSessions;
+use Liberu\Music\ProjectsApi\Http\Controllers\SessionCommandsController;
 use Liberu\Music\ProjectsApi\Http\Controllers\SessionQueriesController;
 use Liberu\Music\ProjectsApi\Support\ApiProblems;
 use Liberu\Music\ProjectsApi\Tests\Fixtures\Actor;
@@ -36,7 +37,7 @@ beforeEach(function () {
 
 it('discovers supported metadata operations without implying native audio capabilities', function () {
     $response = $this->getJson($this->base.'/capabilities')->assertSuccessful()
-        ->assertJsonPath('data.document_schema_versions', [1])->assertJsonPath('data.unsupported.0', 'write_commands');
+        ->assertJsonPath('data.document_schema_versions', [1])->assertJsonPath('data.unsupported.0', 'revision_stream');
     expect($response->headers->get('X-Request-ID'))->toBe($response->json('meta.request_id'));
     expect($response->headers->get('Cache-Control'))->toContain('no-store');
 });
@@ -145,7 +146,7 @@ it('keeps every exposed operation and required token ability in its OpenAPI frag
     expect($contract['openapi'])->toBe('3.1.0');
     $registered = [];
     foreach (app('router')->getRoutes() as $route) {
-        if (! str_starts_with($route->getActionName(), SessionQueriesController::class.'@')) {
+        if (! str_starts_with($route->getActionName(), SessionQueriesController::class.'@') && ! str_starts_with($route->getActionName(), SessionCommandsController::class.'@')) {
             continue;
         }
         $path = '/'.$route->uri();
@@ -162,5 +163,5 @@ it('keeps every exposed operation and required token ability in its OpenAPI frag
     }
     sort($registered);
     sort($documented);
-    expect($registered)->toBe($documented)->toHaveCount(6)->and(array_unique($registered))->toHaveCount(6);
+    expect($registered)->toBe($documented)->toHaveCount(9)->and(array_unique($registered))->toHaveCount(9);
 });

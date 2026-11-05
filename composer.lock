@@ -6884,7 +6884,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-projects-api",
-                "reference": "5171842b3929ab3570d10f01d61c1d107df275c9"
+                "reference": "d6c665656c2351454981d9801a333064ca76a05d"
             },
             "require": {
                 "illuminate/http": "^13.38",
@@ -6928,7 +6928,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Authorized HTTP metadata and portable import preview adapter for Music Projects.",
+            "description": "Authorized Music session metadata, conditional checkpoints, recovery and portable import API.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

@@ -12,6 +12,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use JsonException;
+use Liberu\Music\Projects\Exceptions\IdempotencyConflict;
+use Liberu\Music\Projects\Exceptions\RevisionConflict;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
@@ -24,6 +26,8 @@ final class ApiProblems
             return null;
         }
         $status = match (true) {
+            $exception instanceof IdempotencyConflict => 409,
+            $exception instanceof RevisionConflict => 412,
             $exception instanceof AuthenticationException => 401,
             $exception instanceof AuthorizationException => 403,
             $exception instanceof RecordNotFoundException => 404,
@@ -45,7 +49,12 @@ final class ApiProblems
         return response()->json([
             'type' => 'https://docs.liberusoftware.com/problems/music-projects-'.$status,
             'title' => Response::$statusTexts[$status], 'status' => $status,
-            'detail' => 'The Music Projects request could not be completed.', 'instance' => $request->getPathInfo(),
+            'detail' => match ($status) {
+                409 => 'Use a new idempotency key for a different command.',
+                412 => 'Reload the current revision and reconcile changes before retrying.',
+                428 => 'Supply the quoted expected revision in the If-Match header.',
+                default => 'The Music Projects request could not be completed.',
+            }, 'instance' => $request->getPathInfo(),
             'request_id' => $requestId, 'errors' => $errors,
         ], $status, ['Content-Type' => 'application/problem+json', 'X-Request-ID' => $requestId, 'Cache-Control' => 'no-store']
             + ($exception instanceof HttpExceptionInterface ? $exception->getHeaders() : []));

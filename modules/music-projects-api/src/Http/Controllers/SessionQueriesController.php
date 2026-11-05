@@ -19,8 +19,8 @@ final class SessionQueriesController
         $access->authorize($request->user(), $workspace, '*', 'list');
 
         return $this->response($request, ['schema_version' => 1, 'document_schema_versions' => [1],
-            'operations' => ['browse', 'read', 'history', 'export', 'import_preview'],
-            'unsupported' => ['write_commands', 'revision_stream', 'audio_execution', 'remote_transport', 'asset_transfer', 'async_jobs']]);
+            'operations' => ['browse', 'read', 'history', 'export', 'import_preview', 'checkpoint', 'recover', 'import'],
+            'unsupported' => ['revision_stream', 'audio_execution', 'remote_transport', 'asset_transfer', 'async_jobs']]);
     }
 
     public function index(ReadSessionRequest $request, SessionMetadata $sessions, string $workspace): JsonResponse
