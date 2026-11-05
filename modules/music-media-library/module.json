@@ -2,7 +2,7 @@
   "$schema": "https://schemas.liberu.dev/module/v1.json",
   "name": "music-media-library",
   "display_name": "Music Media Library",
-  "description": "Private Music audio uploads, verified assets, versioned offline pins, retention, waveforms and authorized catalogs.",
+  "description": "Private Music audio assets, versioned packs with rights provenance, offline pins, retention and resumable quarantine cleanup.",
   "version": "0.1.0",
   "category": "product",
   "provider": "Liberu\\Music\\MediaLibrary\\MusicMediaLibraryServiceProvider",
@@ -29,6 +29,9 @@
     "Workspace-scoped media search",
     "Audited media restoration without reference changes",
     "Transactional session media retention",
-    "Versioned owner-scoped offline pins with UTC leases"
+    "Versioned owner-scoped offline pins with UTC leases",
+    "Grace-period cancelled quarantine cleanup with dry runs and recovery",
+    "Versioned media packs with immutable provenance and revision retention",
+    "Policy-reviewed portable pack manifests with verified import mappings"
   ]
 }

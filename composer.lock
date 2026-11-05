@@ -6768,7 +6768,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library",
-                "reference": "8262dd3fd0e415c96c6bd328881155d6064b497a"
+                "reference": "186f3d1bc284cc3696b6751d11f9533260564c75"
             },
             "require": {
                 "illuminate/auth": "^13.38",
@@ -6814,7 +6814,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Private Music audio uploads, verified assets, offline pins, retention, resumable quarantine cleanup and authorized catalogs.",
+            "description": "Private Music audio assets, versioned packs with rights provenance, offline pins, retention and resumable quarantine cleanup.",
             "transport-options": {
                 "symlink": true,
                 "relative": true
