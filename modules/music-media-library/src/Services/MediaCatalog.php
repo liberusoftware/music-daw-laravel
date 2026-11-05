@@ -19,6 +19,7 @@ use Liberu\Music\MediaLibrary\Data\AssetMetadata;
 use Liberu\Music\MediaLibrary\Data\AssetPage;
 use Liberu\Music\MediaLibrary\Data\CatalogEntry;
 use Liberu\Music\MediaLibrary\Events\AssetMetadataUpdated;
+use Liberu\Music\MediaLibrary\Exceptions\MetadataCommandConflict;
 use Liberu\Music\MediaLibrary\Exceptions\MetadataConflict;
 
 final readonly class MediaCatalog
@@ -37,7 +38,7 @@ final readonly class MediaCatalog
             $replay = $this->database->table('music_media_annotation_commands')->where('asset_id', $asset->id)->where('command_key', $command->commandKey)->first();
             if ($replay !== null) {
                 if (! hash_equals($fingerprint, $replay->fingerprint)) {
-                    throw new MetadataConflict('The command key already belongs to another metadata edit.');
+                    throw new MetadataCommandConflict('The command key already belongs to another metadata edit.');
                 }
                 $result = json_decode($replay->result, true, flags: JSON_THROW_ON_ERROR);
 

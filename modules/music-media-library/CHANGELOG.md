@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add durable owner-scoped queued upload verification and original-identity restoration, commit-bound events, retry recovery and serialized cancellation/publication.
+- Distinguish metadata command reuse from stale versions without breaking parent exception catches; reject version overflow.
+
 - Add owner-scoped offline asset sets with optimistic versions, replay-safe renewal/release, explicit UTC leases and commit-bound events.
 
 - Retain session media references in the revision transaction; fail closed when retention cannot participate.

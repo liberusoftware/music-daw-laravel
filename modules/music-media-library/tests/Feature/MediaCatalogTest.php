@@ -20,6 +20,7 @@ use Liberu\Music\MediaLibrary\Commands\SearchAssets;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Commands\UpdateAssetMetadata;
 use Liberu\Music\MediaLibrary\Events\AssetMetadataUpdated;
+use Liberu\Music\MediaLibrary\Exceptions\MetadataCommandConflict;
 use Liberu\Music\MediaLibrary\Exceptions\MetadataConflict;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Services\MediaCatalog;
@@ -230,4 +231,11 @@ it('reads current annotated asset metadata with availability and workspace autho
     expect($this->catalog->get($this->actor, 'studio', $asset->id)->available)->toBeFalse();
     expect(fn () => $this->catalog->get($this->actor, 'other', $asset->id))->toThrow(RecordNotFoundException::class);
     expect(fn () => $this->catalog->get(new GenericUser(['id' => 8]), 'studio', $asset->id))->toThrow(AuthorizationException::class);
+});
+
+it('distinguishes metadata command conflicts and rejects version counter overflow', function () {
+    $asset = ($this->publish)();
+    $this->catalog->update($this->actor, new UpdateAssetMetadata('studio', $asset->id, 'First', [], 0, 'key'));
+    expect(fn () => $this->catalog->update($this->actor, new UpdateAssetMetadata('studio', $asset->id, 'Different', [], 0, 'key')))->toThrow(MetadataCommandConflict::class);
+    expect(fn () => new UpdateAssetMetadata('studio', $asset->id, 'Overflow', [], PHP_INT_MAX, 'overflow'))->toThrow(ValidationException::class);
 });

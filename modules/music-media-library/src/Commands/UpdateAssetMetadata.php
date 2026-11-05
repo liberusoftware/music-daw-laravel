@@ -16,7 +16,7 @@ final readonly class UpdateAssetMetadata
         Validator::make(['workspace' => $workspaceId, 'asset' => $assetId, 'name' => $name, 'tags' => $tags, 'version' => $expectedVersion, 'key' => $commandKey], [
             'workspace' => ['required', 'string', 'max:128'], 'asset' => ['required', 'uuid'], 'name' => ['required', 'string', 'max:255'],
             'tags' => ['array', 'list', 'max:32'], 'tags.*' => ['required', 'string', 'max:64'],
-            'version' => ['integer:strict', 'min:0'], 'key' => ['required', 'string', 'max:128'],
+            'version' => ['integer:strict', 'between:0,'.(PHP_INT_MAX - 1)], 'key' => ['required', 'string', 'max:128'],
         ])->validate();
         $normalized = array_values(array_unique(array_map(fn (string $tag): string => Str::lower(trim($tag)), $tags)));
         Validator::make(['tags' => $normalized], ['tags.*' => ['required', 'string', 'max:64']])->validate();

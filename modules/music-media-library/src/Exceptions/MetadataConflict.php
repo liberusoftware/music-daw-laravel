@@ -6,4 +6,4 @@ namespace Liberu\Music\MediaLibrary\Exceptions;
 
 use RuntimeException;
 
-final class MetadataConflict extends RuntimeException {}
+class MetadataConflict extends RuntimeException {}
