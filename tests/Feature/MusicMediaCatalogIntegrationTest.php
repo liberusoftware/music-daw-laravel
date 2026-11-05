@@ -11,20 +11,23 @@ use Liberu\Foundation\Search\Services\SearchService;
 use Liberu\Music\MediaLibrary\Commands\SaveMediaPack;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Commands\UpdateAssetMetadata;
+use Liberu\Music\MediaLibrary\Exceptions\UploadBudgetExceeded;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Services\MediaCatalog;
 use Liberu\Music\MediaLibrary\Services\MediaPacks;
 use Liberu\Music\MediaLibrary\Services\MediaRetention;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
 use Liberu\Music\MediaLibrary\Services\PackArchives;
+use Liberu\Music\MediaLibrary\Services\UploadBudgets;
 
 it('finds tagged verified audio through the host foundation registry without widening workspace access', function () {
     $this->app->register(MusicMediaLibraryServiceProvider::class);
     $this->artisan('migrate', ['--path' => base_path('modules/music-media-library/database/migrations'), '--realpath' => true])->assertSuccessful();
     config()->set('music-media.disk', 'host-media-catalog');
+    config()->set('music-media.max_reserved_bytes', 192);
     Storage::fake('host-media-catalog');
     $actor = User::factory()->create();
-    foreach (['upload', 'read', 'annotate', 'list', 'retain', 'pack_write', 'pack_read', 'pack_export', 'pack_import', 'distribute'] as $operation) {
+    foreach (['upload', 'read', 'annotate', 'list', 'retain', 'pack_write', 'pack_read', 'pack_export', 'pack_import', 'distribute', 'quota_read'] as $operation) {
         Gate::define('music.media.'.$operation, fn ($user, $workspace) => $user->getKey() === $actor->getKey() && $workspace === 'studio');
     }
     Gate::define('music.media.pack_distribute', fn ($user, $pack) => $user->getKey() === $actor->getKey() && $pack->workspaceId === 'studio' && $pack->rights['license'] === 'CC-BY-4.0');
@@ -72,6 +75,8 @@ it('finds tagged verified audio through the host foundation registry without wid
     } finally {
         fclose($archive);
     }
+    expect(app(UploadBudgets::class)->get($actor, 'studio')->reservedBytes)->toBe(192);
+    expect(fn () => $uploads->start($actor, new StartUpload('studio', (string) Str::uuid(), 'Over budget', strlen($bytes), hash('sha256', $bytes))))->toThrow(UploadBudgetExceeded::class);
     Gate::define('music.media.distribute', fn () => false);
     expect(fn () => $packs->export($actor, 'studio', $packId))->toThrow(AuthorizationException::class);
     expect(fn () => $packs->get(User::factory()->create(), 'studio', $packId))->toThrow(AuthorizationException::class);

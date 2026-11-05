@@ -1,6 +1,6 @@
 {
   "name": "liberusoftware/music-media-library",
-  "description": "Private Music audio assets, reviewed pack manifests and verified ZIP transport, offline pins, retention and resumable cleanup.",
+  "description": "Private verified Music audio, reviewed ZIP packs, workspace upload budgets, retention and resumable cleanup.",
   "type": "liberu-module",
   "license": "MIT",
   "version": "0.1.0",

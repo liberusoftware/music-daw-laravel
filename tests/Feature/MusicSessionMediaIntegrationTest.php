@@ -23,6 +23,7 @@ use Liberu\Music\MediaLibrary\Services\MediaRetention;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
 use Liberu\Music\MediaLibrary\Services\OfflinePins;
 use Liberu\Music\MediaLibrary\Services\QuarantineCleanup;
+use Liberu\Music\MediaLibrary\Services\UploadBudgets;
 use Liberu\Music\Projects\Commands\BackfillSessionRetention;
 use Liberu\Music\Projects\Commands\SaveSession;
 use Liberu\Music\Projects\Contracts\VerifiedMedia;
@@ -44,7 +45,7 @@ it('saves, recovers and reopens portable sessions using actual verified uploaded
     $disk = Storage::fake('music-session-integration');
     $actor = User::factory()->create();
     $other = User::factory()->create();
-    foreach (['music.projects.write', 'music.projects.read', 'music.projects.retain', 'music.media.upload', 'music.media.read', 'music.media.retain', 'music.media.pin', 'music.media.collect'] as $ability) {
+    foreach (['music.projects.write', 'music.projects.read', 'music.projects.retain', 'music.media.upload', 'music.media.read', 'music.media.retain', 'music.media.pin', 'music.media.collect', 'music.media.quota_read'] as $ability) {
         Gate::define($ability, fn ($user, $workspace) => $user->getKey() === $actor->getKey() && in_array($workspace, ['studio', 'other']));
     }
     $scanner = Mockery::mock(MalwareScanner::class);
@@ -118,6 +119,7 @@ it('saves, recovers and reopens portable sessions using actual verified uploaded
     expect(fn () => $cleanup->collect($other, new CollectCancelledUploads('studio', dryRun: false)))->toThrow(AuthorizationException::class);
     expect($cleanup->collect($actor, new CollectCancelledUploads('studio', dryRun: false))->chunkIds)->toHaveCount(1);
     $disk->assertMissing($quarantine);
+    expect(app(UploadBudgets::class)->get($actor, 'studio')->reservedBytes)->toBe(96);
     expect($sessions->get($actor, 'studio', $projectId)->jsonSerialize())->toBe($recovered->jsonSerialize())
         ->and(app(MediaRetention::class)->isProtected($actor, 'studio', $mediaId))->toBeTrue();
     expect(fn () => $offline->get($other, 'studio', $pinId))->toThrow(AuthorizationException::class);

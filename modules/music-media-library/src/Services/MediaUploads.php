@@ -11,6 +11,7 @@ use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Music\MediaLibrary\Commands\RestoreAsset;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
@@ -31,6 +32,7 @@ final readonly class MediaUploads
         private MediaAuthorizer $access,
         private WaveInspector $inspector,
         private Dispatcher $events,
+        private UploadBudgets $budgets,
         private ?MalwareScanner $scanner = null,
     ) {}
 
@@ -40,7 +42,7 @@ final readonly class MediaUploads
         $fingerprint = hash('sha256', json_encode([(string) $actor->getAuthIdentifier(), $command], JSON_THROW_ON_ERROR));
 
         return $this->database->transaction(function () use ($actor, $command, $fingerprint): UploadProgress {
-            $this->database->table('music_media_uploads')->insertOrIgnore([
+            $inserted = $this->database->table('music_media_uploads')->insertOrIgnore([
                 'id' => $command->uploadId, 'workspace_id' => $command->workspaceId,
                 'actor_id' => (string) $actor->getAuthIdentifier(), 'name' => $command->name,
                 'search_name' => Str::lower($command->name),
@@ -53,7 +55,47 @@ final readonly class MediaUploads
                 throw new UploadConflict('This upload identifier was already used for different content.');
             }
 
+            if ($inserted === 1) {
+                $this->budgets->reserveInTransaction($actor, $command->workspaceId, $command->uploadId, $this->database);
+            }
+
             return $this->progress($upload);
+        }, 3);
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $commands
+     * @return list<UploadProgress>
+     */
+    public function startBatch(Authenticatable $actor, array $commands): array
+    {
+        Validator::make(['commands' => $commands], ['commands' => ['required', 'array', 'list', 'max:1000']])->validate();
+        $ids = [];
+        $typed = [];
+        foreach ($commands as $command) {
+            if (! $command instanceof StartUpload) {
+                throw ValidationException::withMessages(['commands' => 'Every upload declaration must be a typed StartUpload command.']);
+            }
+            $ids[] = $command->uploadId;
+            $typed[] = $command;
+        }
+        if (count(array_unique($ids)) !== count($ids)) {
+            throw ValidationException::withMessages(['commands' => 'A batch must declare each destination upload identifier once.']);
+        }
+        $ordered = $typed;
+        usort($ordered, fn (StartUpload $left, StartUpload $right): int => strcmp($left->workspaceId."\0".$left->uploadId, $right->workspaceId."\0".$right->uploadId));
+
+        return $this->database->transaction(function () use ($actor, $typed, $ordered): array {
+            $started = [];
+            foreach ($ordered as $command) {
+                $progress = $this->start($actor, $command);
+                if ($progress->status === 'cancelled') {
+                    throw new UploadConflict('Cancelled upload identities cannot be accepted in a new batch.');
+                }
+                $started[$command->uploadId] = $progress;
+            }
+
+            return array_map(fn (StartUpload $command): UploadProgress => $started[$command->uploadId], $typed);
         }, 3);
     }
 
@@ -228,16 +270,19 @@ final readonly class MediaUploads
     {
         $this->access->authorize($actor, $workspaceId, $uploadId, 'upload');
 
-        return $this->database->transaction(function () use ($workspaceId, $uploadId): UploadProgress {
+        return $this->database->transaction(function () use ($actor, $workspaceId, $uploadId): UploadProgress {
             $upload = $this->upload($workspaceId, $uploadId)->lockForUpdate()->firstOrFail();
             if ($upload->status === 'ready') {
                 throw new UploadConflict('Published assets require retention checks and cannot be cancelled.');
             }
             if ($upload->status === 'cancelled') {
+                $this->budgets->releaseCancelledInTransaction($actor, $workspaceId, [$uploadId], $this->database);
+
                 return $this->progress($upload);
             }
             $this->upload($workspaceId, $uploadId)->update(['status' => 'cancelled', 'cancelled_at' => now('UTC'), 'updated_at' => now()]);
             $upload->status = 'cancelled';
+            $this->budgets->releaseCancelledInTransaction($actor, $workspaceId, [$uploadId], $this->database);
 
             return $this->progress($upload);
         }, 3);

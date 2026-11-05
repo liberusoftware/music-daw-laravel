@@ -6768,7 +6768,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library",
-                "reference": "59aeb5310ccacc54fc3e00a23561cbca375bec4d"
+                "reference": "e9134fc790c7ecdfc5ac16697dd1a05112a16bce"
             },
             "require": {
                 "ext-zip": "*",
@@ -6816,7 +6816,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Private Music audio assets, reviewed pack manifests and verified ZIP transport, offline pins, retention and resumable cleanup.",
+            "description": "Private verified Music audio, reviewed ZIP packs, workspace upload budgets, retention and resumable cleanup.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

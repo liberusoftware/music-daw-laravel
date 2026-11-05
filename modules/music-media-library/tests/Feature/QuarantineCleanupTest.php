@@ -23,6 +23,7 @@ use Liberu\Music\MediaLibrary\Services\MediaRetention;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
 use Liberu\Music\MediaLibrary\Services\OfflinePins;
 use Liberu\Music\MediaLibrary\Services\QuarantineCleanup;
+use Liberu\Music\MediaLibrary\Services\UploadBudgets;
 
 beforeEach(function () {
     $this->artisan('migrate', ['--path' => realpath(__DIR__.'/../../database/migrations'), '--realpath' => true])->assertSuccessful();
@@ -165,7 +166,7 @@ it('retries safely after partial physical deletion without acknowledging failed 
     $objects->shouldReceive('delete')->with($keys[0])->once()->andReturnUsing(fn () => $this->disk->delete($keys[0]));
     $objects->shouldReceive('exists')->with($keys[1])->andReturn(true);
     $objects->shouldReceive('delete')->with($keys[1])->once()->andReturn(false);
-    $cleanup = new QuarantineCleanup(DB::connection(), $objects, app(MediaAuthorizer::class), app(Dispatcher::class));
+    $cleanup = new QuarantineCleanup(DB::connection(), $objects, app(MediaAuthorizer::class), app(Dispatcher::class), app(UploadBudgets::class));
     expect(fn () => $cleanup->collect($this->actor, new CollectCancelledUploads('studio', dryRun: false)))->toThrow(RuntimeException::class, 'removed');
     $this->disk->assertMissing($keys[0]);
     $this->disk->assertExists($keys[1]);
@@ -182,7 +183,7 @@ it('refuses a successful delete response while the object remains present', func
     $objects = Mockery::mock(Filesystem::class);
     $objects->shouldReceive('exists')->with($keys[0])->twice()->andReturn(true);
     $objects->shouldReceive('delete')->with($keys[0])->once()->andReturn(true);
-    $cleanup = new QuarantineCleanup(DB::connection(), $objects, app(MediaAuthorizer::class), app(Dispatcher::class));
+    $cleanup = new QuarantineCleanup(DB::connection(), $objects, app(MediaAuthorizer::class), app(Dispatcher::class), app(UploadBudgets::class));
     expect(fn () => $cleanup->collect($this->actor, new CollectCancelledUploads('studio', dryRun: false)))->toThrow(RuntimeException::class);
     expect(DB::table('music_media_upload_chunks')->count())->toBe(2)->and($this->events)->toBe([]);
 });

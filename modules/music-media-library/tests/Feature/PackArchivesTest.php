@@ -16,6 +16,7 @@ use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\Contracts\ZipArchiveFactory;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
+use Liberu\Music\MediaLibrary\Exceptions\UploadBudgetExceeded;
 use Liberu\Music\MediaLibrary\Services\MediaPacks;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
 use Liberu\Music\MediaLibrary\Services\PackArchives;
@@ -444,4 +445,16 @@ it('rejects foreign pack identities before ingesting otherwise authorized destin
     $source = ($this->export)();
     expect(fn () => $this->archives->importFrom($this->actor, 'other', $this->packId, $source, [$id => (string) Str::uuid()], 'foreign-pack'))->toThrow(RecordNotFoundException::class);
     expect(DB::table('music_media_uploads')->count())->toBe(1);
+});
+
+it('rejects an over budget archive plan before accepting destination declarations or audio', function () {
+    $ids = [($this->publish)(), ($this->publish)(sample: 1)];
+    ($this->save)($ids);
+    $source = ($this->export)();
+    config()->set('music-media.max_reserved_bytes', 96);
+    $map = array_combine($ids, [(string) Str::uuid(), (string) Str::uuid()]);
+    expect(fn () => $this->archives->importFrom($this->actor, 'other', (string) Str::uuid(), $source, $map, 'budget-plan'))->toThrow(UploadBudgetExceeded::class);
+    expect(DB::table('music_media_uploads')->where('workspace_id', 'other')->count())->toBe(0)
+        ->and(DB::table('music_media_workspace_usage')->where('workspace_id', 'other')->count())->toBe(0)
+        ->and(DB::table('music_media_packs')->count())->toBe(1);
 });

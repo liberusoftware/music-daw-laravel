@@ -147,16 +147,21 @@ final readonly class PackArchives
                         throw new RecordNotFoundException('A destination upload identifier belongs to another workspace.');
                     }
                 }
+                $commands = [];
                 foreach ($pack->assets as $asset) {
                     $id = $assetMap[$asset['reference']['id']];
                     $entry = 'assets/'.$asset['reference']['sha256'].'.wav';
-                    if (isset($existing[$id]) && $existing[$id]->status === 'ready') {
-                        $this->uploads->complete($actor, $workspaceId, $id);
-
-                        continue;
+                    if (! isset($existing[$id]) || $existing[$id]->status !== 'ready') {
+                        $commands[] = new StartUpload($workspaceId, $id, $asset['name'], $entries[$entry], $asset['reference']['sha256'], $asset['provenance']);
                     }
-                    $progress = $this->uploads->start($actor, new StartUpload($workspaceId, $id, $asset['name'], $entries[$entry], $asset['reference']['sha256'], $asset['provenance']));
-                    if ($progress->status !== 'ready') {
+                }
+                if ($commands !== []) {
+                    $this->uploads->startBatch($actor, $commands);
+                }
+                foreach ($pack->assets as $asset) {
+                    $id = $assetMap[$asset['reference']['id']];
+                    $entry = 'assets/'.$asset['reference']['sha256'].'.wav';
+                    if (! isset($existing[$id]) || $existing[$id]->status !== 'ready') {
                         $this->receive($actor, $workspaceId, $id, $zip, $entry, $entries[$entry]);
                     }
                     $this->uploads->complete($actor, $workspaceId, $id);

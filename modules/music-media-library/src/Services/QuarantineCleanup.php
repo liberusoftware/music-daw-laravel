@@ -19,7 +19,7 @@ use RuntimeException;
 
 final readonly class QuarantineCleanup
 {
-    public function __construct(private ConnectionInterface $database, private Filesystem $objects, private MediaAuthorizer $access, private Dispatcher $events) {}
+    public function __construct(private ConnectionInterface $database, private Filesystem $objects, private MediaAuthorizer $access, private Dispatcher $events, private UploadBudgets $budgets) {}
 
     public function collect(Authenticatable $actor, CollectCancelledUploads $command): QuarantineCollection
     {
@@ -59,6 +59,7 @@ final readonly class QuarantineCleanup
                     }
                 }
                 $this->database->table('music_media_upload_chunks')->whereIn('id', $ids)->delete();
+                $this->budgets->releaseCancelledInTransaction($actor, $command->workspaceId, array_values(array_unique($rows->pluck('upload_id')->all())), $this->database);
                 $this->events->dispatch(new QuarantineCollected($report, (string) $actor->getAuthIdentifier()));
             }
 
