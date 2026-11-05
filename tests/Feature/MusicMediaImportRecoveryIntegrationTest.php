@@ -12,6 +12,7 @@ use Liberu\Music\MediaLibrary\Data\MediaPack;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Services\AssetProcessing;
 use Liberu\Music\MediaLibrary\Services\MediaRetention;
+use Liberu\Music\MediaLibrary\Services\TrashRecovery;
 use Liberu\Music\MediaLibrary\Services\WaveformProcessing;
 use Liberu\Music\MediaLibraryApi\MusicMediaLibraryApiServiceProvider;
 
@@ -23,12 +24,12 @@ it('imports indexes tags finds and restores retained audio through the host HTTP
     config()->set('music-media.disk', 'host-media-import-recovery');
     $disk = Storage::fake('host-media-import-recovery');
     $actor = User::factory()->create();
-    foreach (['upload', 'read', 'list', 'annotate', 'restore', 'retain', 'download', 'pack_read', 'pack_write', 'pack_import', 'pack_export', 'distribute', 'pin'] as $operation) {
+    foreach (['upload', 'read', 'list', 'annotate', 'restore', 'retain', 'download', 'pack_read', 'pack_write', 'pack_import', 'pack_export', 'distribute', 'pin', 'trash', 'trash_list'] as $operation) {
         Gate::define('music.media.'.$operation, fn ($user, $workspace) => $user->getKey() === $actor->getKey() && $workspace === 'studio');
     }
-    app()->instance(MalwareScanner::class, Mockery::mock(MalwareScanner::class)->shouldReceive('clean')->twice()->andReturnTrue()->getMock());
+    app()->instance(MalwareScanner::class, Mockery::mock(MalwareScanner::class)->shouldReceive('clean')->times(3)->andReturnTrue()->getMock());
     Bus::fake();
-    $token = $actor->createToken('music-import', ['music.media.read', 'music.media.upload', 'music.media.edit', 'music.media.process', 'music.media.restore', 'music.media.download', 'music.media.packs.read', 'music.media.packs.write', 'music.media.packs.import', 'music.media.packs.export', 'music.media.pins.read', 'music.media.pins.write'])->plainTextToken;
+    $token = $actor->createToken('music-import', ['music.media.read', 'music.media.upload', 'music.media.edit', 'music.media.process', 'music.media.restore', 'music.media.download', 'music.media.packs.read', 'music.media.packs.write', 'music.media.packs.import', 'music.media.packs.export', 'music.media.pins.read', 'music.media.pins.write', 'music.media.trash.read', 'music.media.trash.write'])->plainTextToken;
     $this->withToken($token);
     $format = pack('vvVVvv', 1, 1, 48000, 96000, 2, 16);
     $chunks = 'fmt '.pack('V', 16).$format.'data'.pack('V', 4).pack('v*', 0, 16384);
@@ -84,10 +85,27 @@ it('imports indexes tags finds and restores retained audio through the host HTTP
     $this->getJson($pinUrl)->assertSuccessful()->assertJsonPath('data.asset_ids.0', $assetId);
     $this->withHeaders(['Idempotency-Key' => 'pin-release', 'If-Match' => '"1"'])->putJson($pinUrl, ['asset_ids' => []])->assertSuccessful()->assertHeader('ETag', '"2"');
     expect(app(MediaRetention::class)->isProtected($actor, 'studio', $assetId))->toBeTrue();
+    $trashCommand = (string) Str::uuid();
+    $this->withHeader('Idempotency-Key', $trashCommand)->putJson($base.'/trash-commands/'.$trashCommand, ['asset_ids' => [$assetId]])->assertConflict();
+    $unprotected = (string) Str::uuid();
+    $receive($unprotected);
+    $verification = (string) Str::uuid();
+    $this->withHeader('Idempotency-Key', $verification)->putJson($base.'/verification-tasks/'.$verification, ['upload_id' => $unprotected])->assertAccepted();
+    app(AssetProcessing::class)->process($verification);
+    $trashCommand = (string) Str::uuid();
+    $this->withHeader('Idempotency-Key', $trashCommand)->putJson($base.'/trash-commands/'.$trashCommand, ['asset_ids' => [$unprotected]])->assertSuccessful();
+    $this->getJson($base.'/trash')->assertSuccessful()->assertJsonPath('data.0.id', $unprotected);
+    $recovery = (string) Str::uuid();
+    $this->withHeader('Idempotency-Key', $recovery)->putJson($base.'/assets/'.$unprotected.'/trash-recovery-tasks/'.$recovery)->assertAccepted();
+    $recoveryUrl = $base.'/trash-recovery-tasks/'.$recovery;
+    $this->getJson($recoveryUrl.'/result')->assertAccepted();
+    app(TrashRecovery::class)->process($recovery);
+    $this->getJson($recoveryUrl.'/result')->assertSuccessful()->assertJsonPath('data.id', $unprotected);
     $actor->tokens()->delete();
     app('auth')->forgetGuards();
     $this->getJson($base.'/assets/'.$assetId)->assertUnauthorized();
     $this->get($url)->assertUnauthorized();
     $this->getJson($packUrl)->assertUnauthorized();
     $this->getJson($pinUrl)->assertUnauthorized();
+    $this->getJson($recoveryUrl)->assertUnauthorized();
 });

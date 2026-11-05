@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add durable owned queued trash recovery with live worker policies, safe failure/retry outcomes and serialized cancellation/publication.
+- Add paginated authorized trash browsing and replay-safe protected batch trash HTTP commands.
+
 - Add actor-owned conditional offline pin read/save, lease renewal and release with replay-safe receipts and live retention policy checks.
 
 - Add conditional replay-safe rights/provenance pack saves, historical reads, paginated revision summaries and reviewed portable manifest export/preview/import.

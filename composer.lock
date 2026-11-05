@@ -6768,7 +6768,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library",
-                "reference": "fbcb39aaae76c56b32753e8420582cb939a5581d"
+                "reference": "b378d7433f0fb37d21cdb26e85a32d8c671c0838"
             },
             "require": {
                 "ext-zip": "*",
@@ -6819,7 +6819,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Verified Music audio, private downloads, queued recovery, reviewed packs and reference-safe cleanup.",
+            "description": "Verified Music audio, queued publication and trash recovery, rights packs and reference-safe cleanup.",
             "transport-options": {
                 "symlink": true,
                 "relative": true
@@ -6831,7 +6831,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library-api",
-                "reference": "92dc0e6b764361472eb1537a690eb9b80225cd95"
+                "reference": "a446c3de73d45f3f544915f49fc5248cd35e2f61"
             },
             "require": {
                 "illuminate/encryption": "^13.38",
@@ -6876,7 +6876,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Authorized Music media transfers, rights manifests, actor-owned offline pins and queued processing APIs.",
+            "description": "Authorized Music transfers, rights manifests, offline pins and reference-safe trash/recovery APIs.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

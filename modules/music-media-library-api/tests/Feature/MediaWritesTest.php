@@ -18,6 +18,7 @@ use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Services\AssetProcessing;
 use Liberu\Music\MediaLibrary\Services\MediaRetention;
+use Liberu\Music\MediaLibrary\Services\TrashRecovery;
 use Liberu\Music\MediaLibraryApi\Http\Middleware\ApiBoundary;
 use Liberu\Music\MediaLibraryApi\Tests\Fixtures\Actor;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -484,5 +485,109 @@ describe('actor-owned offline pins', function () {
         $this->getJson($this->pinUrl)->assertNotFound();
         DB::table('music_media_uploads')->where('id', $this->asset)->update(['status' => 'uploading']);
         ($this->savePin)([$this->asset])->assertNotFound();
+    });
+});
+
+describe('reference-safe trash and queued recovery', function () {
+    beforeEach(function () {
+        foreach (['trash', 'trash_list'] as $operation) {
+            app(Gate::class)->define('music.media.'.$operation, fn ($actor, $workspace) => $actor->id === 7 && in_array($workspace, ['studio', 'other']) && $this->denied !== $operation);
+        }
+        app()->when(TrashRecovery::class)->needs(UserProvider::class)->give(fn () => Mockery::mock(UserProvider::class)->shouldReceive('retrieveById')->with('7')->andReturn($this->actor)->getMock());
+        Sanctum::actingAs($this->actor, ['music.media.read', 'music.media.upload', 'music.media.restore', 'music.media.trash.read', 'music.media.trash.write']);
+        $this->asset = ($this->publish)();
+        $this->trash = function (array $ids, ?string $key = null, int $grace = 24) {
+            $key ??= (string) Str::uuid();
+
+            return $this->withHeader('Idempotency-Key', $key)->putJson($this->base.'/trash-commands/'.$key, ['asset_ids' => $ids, 'grace_hours' => $grace]);
+        };
+        $this->recover = fn (string $task) => $this->withHeader('Idempotency-Key', $task)->putJson($this->base.'/assets/'.$this->asset.'/trash-recovery-tasks/'.$task);
+    });
+
+    it('trashes browses and asynchronously recovers verified audio while preserving original identity', function () {
+        $second = ($this->publish)();
+        $key = (string) Str::uuid();
+        ($this->trash)([$this->asset, $second], $key)->assertSuccessful()->assertJsonPath('data.status', 'trashed');
+        ($this->trash)([$second, $this->asset], $key)->assertSuccessful();
+        ($this->trash)([$this->asset], $key)->assertConflict();
+        $this->getJson($this->base.'/assets/'.$this->asset)->assertNotFound();
+        $first = $this->getJson($this->base.'/trash?page[size]=1')->assertSuccessful()->assertJsonCount(1, 'data');
+        $cursor = $first->json('meta.next_cursor');
+        expect($cursor)->toBeString();
+        $this->getJson($this->base.'/trash?page[size]=1&page[after]='.urlencode($cursor))->assertSuccessful()->assertJsonCount(1, 'data')->assertJsonPath('meta.next_cursor', null);
+        $this->getJson($this->base.'/trash?page[size]=2&page[after]='.urlencode($cursor))->assertUnprocessable();
+        $task = (string) Str::uuid();
+        ($this->recover)($task)->assertAccepted()->assertJsonPath('data.kind', 'recover_trash');
+        $taskUrl = $this->base.'/trash-recovery-tasks/'.$task;
+        $this->getJson($taskUrl)->assertSuccessful()->assertJsonPath('data.status', 'queued');
+        $this->getJson($taskUrl.'/result')->assertAccepted()->assertHeader('Retry-After', '2');
+        app(TrashRecovery::class)->process($task);
+        $this->getJson($taskUrl.'/result')->assertSuccessful()->assertJsonPath('data.id', $this->asset);
+        ($this->recover)($task)->assertSuccessful()->assertJsonPath('data.status', 'ready');
+        $this->getJson($this->base.'/assets/'.$this->asset)->assertSuccessful();
+        $this->withHeader('Idempotency-Key', $task)->deleteJson($taskUrl)->assertConflict();
+    });
+
+    it('cancels queued recovery and returns safe failed outcomes with retry support', function () {
+        ($this->trash)([$this->asset])->assertSuccessful();
+        $task = (string) Str::uuid();
+        ($this->recover)($task)->assertAccepted();
+        $url = $this->base.'/trash-recovery-tasks/'.$task;
+        $this->deleteJson($url)->assertSuccessful()->assertJsonPath('data.status', 'cancelled');
+        $this->deleteJson($url)->assertSuccessful();
+        $this->getJson($url.'/result')->assertConflict();
+        app(TrashRecovery::class)->process($task);
+        $this->getJson($this->base.'/assets/'.$this->asset)->assertNotFound();
+        $task = (string) Str::uuid();
+        ($this->recover)($task)->assertAccepted();
+        $url = $this->base.'/trash-recovery-tasks/'.$task;
+        $blob = 'music/assets/'.hash('sha256', 'studio').'/'.hash('sha256', $this->bytes);
+        $this->disk->put($blob, 'bad');
+        expect(fn () => app(TrashRecovery::class)->process($task))->toThrow(InvalidAudio::class);
+        app(TrashRecovery::class)->failed($task);
+        $this->getJson($url)->assertSuccessful()->assertJsonPath('data.error_code', 'trash_recovery_failed');
+        $this->getJson($url.'/result')->assertConflict();
+        $this->disk->put($blob, $this->bytes);
+        ($this->recover)($task)->assertAccepted();
+        app(TrashRecovery::class)->process($task);
+        $this->getJson($url.'/result')->assertSuccessful();
+    });
+
+    it('rejects protected batches and validates lifecycle request identity access and limits', function () {
+        $second = ($this->publish)();
+        app(MediaRetention::class)->retain($this->actor, new RetainAssets('studio', 'revision:1', [$second]));
+        ($this->trash)([$this->asset, $second])->assertConflict();
+        $this->getJson($this->base.'/assets/'.$this->asset)->assertSuccessful();
+        ($this->trash)([$this->asset], grace: 23)->assertUnprocessable();
+        ($this->trash)([$this->asset, $this->asset])->assertUnprocessable();
+        ($this->trash)([(string) Str::uuid()])->assertNotFound();
+        $this->getJson($this->base.'/trash?page[size]=101')->assertUnprocessable();
+        $this->getJson($this->base.'/trash?page[after]=bad')->assertUnprocessable();
+        $key = (string) Str::uuid();
+        $this->flushHeaders()->putJson($this->base.'/trash-commands/'.$key, ['asset_ids' => [$this->asset]])->assertStatus(428);
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())->putJson($this->base.'/trash-commands/'.$key, ['asset_ids' => [$this->asset]])->assertUnprocessable();
+        ($this->trash)([$this->asset])->assertSuccessful();
+        $task = (string) Str::uuid();
+        ($this->recover)($task)->assertAccepted();
+        $url = $this->base.'/trash-recovery-tasks/'.$task;
+        $this->getJson(str_replace('/studio/', '/other/', $url))->assertNotFound();
+        Sanctum::actingAs((new Actor())->forceFill(['id' => 8]), ['music.media.read', 'music.media.restore']);
+        $this->getJson($url)->assertNotFound();
+        Sanctum::actingAs($this->actor, ['music.media.read']);
+        $this->getJson($this->base.'/trash')->assertForbidden();
+        ($this->trash)([$second])->assertForbidden();
+        ($this->recover)($task)->assertForbidden();
+        $this->getJson($url)->assertForbidden();
+        $this->getJson($url.'/result')->assertForbidden();
+        $this->deleteJson($url)->assertForbidden();
+        Sanctum::actingAs($this->actor, ['music.media.read', 'music.media.restore', 'music.media.trash.read', 'music.media.trash.write']);
+        $this->denied = 'restore';
+        $this->getJson($url)->assertForbidden();
+        ($this->recover)($task)->assertForbidden();
+        $this->deleteJson($url)->assertForbidden();
+        $this->denied = 'trash_list';
+        $this->getJson($this->base.'/trash')->assertForbidden();
+        $this->denied = 'trash';
+        ($this->trash)([$second])->assertForbidden();
     });
 });

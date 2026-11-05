@@ -23,8 +23,8 @@ final class MediaController
     {
         $access->authorize($request->user(), $workspace, '*', 'list');
 
-        return $this->response($request, ['schema_version' => 1, 'operations' => ['browse', 'read', 'offline_pin_read', 'offline_pin_save', 'pack_read', 'pack_save', 'pack_history', 'pack_export', 'pack_import_preview', 'pack_import', 'download_url', 'download', 'metadata_update', 'upload_declare', 'upload_chunk', 'upload_status', 'upload_cancel', 'asset_verify', 'asset_restore', 'asset_task_status', 'asset_task_result', 'asset_task_cancel', 'upload_budget', 'waveform_request', 'waveform_status', 'waveform_result', 'waveform_cancel'],
-            'unsupported' => ['pack_audio_archives', 'lifecycle_commands', 'native_audio_execution']]);
+        return $this->response($request, ['schema_version' => 1, 'operations' => ['browse', 'read', 'trash_browse', 'trash', 'trash_recovery_request', 'trash_recovery_status', 'trash_recovery_result', 'trash_recovery_cancel', 'offline_pin_read', 'offline_pin_save', 'pack_read', 'pack_save', 'pack_history', 'pack_export', 'pack_import_preview', 'pack_import', 'download_url', 'download', 'metadata_update', 'upload_declare', 'upload_chunk', 'upload_status', 'upload_cancel', 'asset_verify', 'asset_restore', 'asset_task_status', 'asset_task_result', 'asset_task_cancel', 'upload_budget', 'waveform_request', 'waveform_status', 'waveform_result', 'waveform_cancel'],
+            'unsupported' => ['pack_audio_archives', 'physical_garbage_collection', 'native_audio_execution']]);
     }
 
     public function index(BrowseMediaRequest $request, MediaCatalog $catalog, CatalogCursor $cursors, string $workspace): JsonResponse
