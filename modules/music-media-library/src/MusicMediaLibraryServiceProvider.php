@@ -37,7 +37,9 @@ final class MusicMediaLibraryServiceProvider extends ServiceProvider
         $this->app->bindIf(PackDistributionPolicy::class, GatePackDistribution::class);
         $this->app->bindIf(ZipArchiveFactory::class, NativeZipArchiveFactory::class);
         $this->app->bindIf(UploadBudgetPolicy::class, ConfiguredUploadBudget::class);
-        $this->app->when([ScopedMediaAccess::class, WaveformProcessing::class])->needs(UserProvider::class)->give(fn () => $this->app->make('auth')->createUserProvider(config('auth.guards.'.config('auth.defaults.guard').'.provider')));
+        $provider = config('music-media.user_provider') ?? config('auth.guards.'.config('auth.defaults.guard').'.provider')
+            ?? config('auth.passwords.'.config('auth.defaults.passwords').'.provider');
+        $this->app->when([ScopedMediaAccess::class, WaveformProcessing::class])->needs(UserProvider::class)->give(fn () => $this->app->make('auth')->createUserProvider($provider));
         $this->app->when([AssetLifecycle::class, AssetGarbageCollection::class, MediaUploads::class, AssetWaveforms::class, MediaCatalog::class, QuarantineCleanup::class, MediaPacks::class, PackArchives::class])->needs(Filesystem::class)->give(fn () => $this->app->make('filesystem')->disk(config('music-media.disk')));
         $this->app->when(PackArchives::class)->needs('$maxAudioBytes')->give(fn () => config('music-media.archive_max_audio_bytes'));
     }

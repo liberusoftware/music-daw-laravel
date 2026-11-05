@@ -21,6 +21,7 @@ use Liberu\Music\MediaLibrary\Events\WaveformTaskChanged;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
 use Liberu\Music\MediaLibrary\Exceptions\UploadConflict;
 use Liberu\Music\MediaLibrary\Jobs\BuildWaveform;
+use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Services\AssetWaveforms;
 use Liberu\Music\MediaLibrary\Services\CachedWaveforms;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
@@ -297,3 +298,19 @@ it('does not publish a ready result when cancellation commits during derivation'
     expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('cancelled')
         ->and($this->processing->result($this->actor, 'studio', $command->taskId))->toBeNull()->and($this->events)->toHaveCount(2);
 });
+
+it('resolves the canonical provider independently of later Sanctum guard selection', function (string $guard, ?string $explicit) {
+    $command = ($this->command)();
+    $this->processing->request($this->actor, $command);
+    app('auth')->provider('music-test', fn () => $this->users);
+    config()->set('auth.providers.canonical', ['driver' => 'music-test']);
+    config()->set('auth.guards.web.provider', 'canonical');
+    config()->set('auth.defaults.passwords', 'users');
+    config()->set('auth.passwords.users.provider', 'canonical');
+    config()->set('auth.defaults.guard', $guard);
+    config()->set('music-media.user_provider', $explicit);
+    (new MusicMediaLibraryServiceProvider(app()))->register();
+    config()->set('auth.defaults.guard', 'sanctum');
+    app(WaveformProcessing::class)->process($command->taskId);
+    expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('ready');
+})->with([['web', null], ['sanctum', null], ['sanctum', 'canonical']]);
