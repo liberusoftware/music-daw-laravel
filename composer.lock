@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "2b3d4a272f68d3945dd27794b8cdb220",
+    "content-hash": "0396f8d771df7fdf8a163abc3db3fad1",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -6990,6 +6990,62 @@
                 "MIT"
             ],
             "description": "Authorized Music session commands, metadata, portable imports and reconnectable revision polling.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "liberusoftware/music-projects-livewire",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "modules/music-projects-livewire",
+                "reference": "1321568d587bb97308d9b3e0821a18c668dd37a0"
+            },
+            "require": {
+                "illuminate/routing": "^13.38",
+                "illuminate/support": "^13.38",
+                "illuminate/validation": "^13.38",
+                "liberusoftware/music-projects": "^0.1 || dev-main",
+                "livewire/livewire": "^4.4",
+                "php": "^8.5"
+            },
+            "require-dev": {
+                "liberusoftware/package-testbench": "^1.8",
+                "pestphp/pest": "^5.3"
+            },
+            "type": "liberu-module",
+            "extra": {
+                "liberu": {
+                    "name": "music-projects-livewire"
+                },
+                "laravel": {
+                    "providers": []
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Liberu\\Music\\ProjectsLivewire\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Liberu\\Music\\ProjectsLivewire\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ],
+                "test:coverage": [
+                    "pest --coverage --min=100"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Music session workspace, track metadata, checkpoints, recovery and reviewed portable imports.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

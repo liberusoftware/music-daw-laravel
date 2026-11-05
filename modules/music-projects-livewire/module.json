@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schemas.liberu.dev/module/v1.json",
+  "name": "music-projects-livewire",
+  "display_name": "Music Projects Livewire",
+  "description": "Music session workspace, track metadata, checkpoints, recovery and reviewed portable imports.",
+  "version": "0.1.0",
+  "category": "presentation",
+  "provider": "Liberu\\Music\\ProjectsLivewire\\MusicProjectsLivewireServiceProvider",
+  "requires": {
+    "php": "^8.5",
+    "laravel": "^13.0",
+    "packages": {
+      "liberusoftware/music-projects": "^0.1 || dev-main"
+    }
+  },
+  "capabilities": [
+    "music.projects.livewire"
+  ],
+  "default_enabled": false,
+  "features": [
+    "Authorized session workspace and track metadata",
+    "Conditional checkpoints and autosaves",
+    "Historical recovery and portable import review",
+    "Versioned draft backup and recovery"
+  ]
+}
