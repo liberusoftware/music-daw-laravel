@@ -1,6 +1,6 @@
 {
     "organization": "liberusoftware",
-    "repository": "music-laravel",
+    "repository": "music-daw-laravel",
     "genre": "music",
     "scriptsRepository": "boilerplate-scripts",
     "components": {

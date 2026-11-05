@@ -1,6 +1,6 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "liberusoftware/music-laravel",
+    "name": "liberusoftware/music-daw-laravel",
     "type": "project",
     "description": "Liberu Music Laravel host skeleton for a modular Digital Audio Workstation.",
     "keywords": [

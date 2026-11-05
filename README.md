@@ -56,8 +56,8 @@ The [product scope](https://github.com/liberusoftware/documentation/blob/main/pr
 These commands set up the inherited Laravel foundation only.
 
 ```bash
-git clone https://github.com/liberusoftware/music-laravel.git
-cd music-laravel
+git clone https://github.com/liberusoftware/music-daw-laravel.git
+cd music-daw-laravel
 composer install
 cp .env.example .env
 php artisan key:generate
@@ -143,4 +143,4 @@ Feedback and contributions are welcome. Report reproducible bugs, propose focuse
 
 ## Contributors
 
-Thank you to everyone who helps improve Liberu. [View the contributors graph](https://github.com/liberusoftware/music-laravel/graphs/contributors).
+Thank you to everyone who helps improve Liberu. [View the contributors graph](https://github.com/liberusoftware/music-daw-laravel/graphs/contributors).
