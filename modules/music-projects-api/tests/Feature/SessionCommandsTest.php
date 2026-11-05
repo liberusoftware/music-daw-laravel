@@ -156,3 +156,10 @@ it('distinguishes immutable template state conflicts from current revision preco
         ->assertJsonPath('type', 'https://docs.liberusoftware.com/problems/music-projects-idempotency-conflict');
     $this->postJson($this->base.'/checkpoints', $this->payload + ['template' => true], ($this->headers)(1, 'update'))->assertCreated()->assertJsonPath('data.version', 2);
 });
+
+it('does not expose historical content through recovery to a write-only delegated token', function () {
+    $this->postJson($this->base.'/checkpoints', $this->payload, ($this->headers)(0, 'create'))->assertCreated();
+    Sanctum::actingAs($this->actor, ['music.projects.write']);
+    $this->postJson($this->base.'/recoveries', ['source_version' => 1], ($this->headers)(1, 'recover'))->assertForbidden();
+    expect(DB::table('music_project_revisions')->count())->toBe(1);
+});

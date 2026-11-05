@@ -152,7 +152,9 @@ it('keeps every exposed operation and required token ability in its OpenAPI frag
         $path = '/'.$route->uri();
         $method = strtolower($route->methods()[0]);
         $operation = $contract['paths'][$path][$method];
-        expect($route->gatherMiddleware())->toContain(CheckAbilities::class.':'.$operation['x-required-abilities'][0]);
+        foreach ($operation['x-required-abilities'] as $ability) {
+            expect($route->gatherMiddleware())->toContain(CheckAbilities::class.':'.$ability);
+        }
         $registered[] = $operation['operationId'];
     }
     $documented = [];
@@ -163,5 +165,5 @@ it('keeps every exposed operation and required token ability in its OpenAPI frag
     }
     sort($registered);
     sort($documented);
-    expect($registered)->toBe($documented)->toHaveCount(9)->and(array_unique($registered))->toHaveCount(9);
+    expect($registered)->toBe($documented)->toHaveCount(10)->and(array_unique($registered))->toHaveCount(10);
 });

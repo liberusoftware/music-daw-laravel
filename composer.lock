@@ -6887,9 +6887,10 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-projects-api",
-                "reference": "d6c665656c2351454981d9801a333064ca76a05d"
+                "reference": "8d72ed89043b075630439e54c765b0b82236b3da"
             },
             "require": {
+                "illuminate/encryption": "^13.38",
                 "illuminate/http": "^13.38",
                 "illuminate/routing": "^13.38",
                 "illuminate/validation": "^13.38",
@@ -6931,7 +6932,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Authorized Music session metadata, conditional checkpoints, recovery and portable import API.",
+            "description": "Authorized Music session commands, metadata, portable imports and reconnectable revision polling.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

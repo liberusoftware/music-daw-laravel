@@ -1,6 +1,6 @@
 {
   "name": "liberusoftware/music-projects-api",
-  "description": "Authorized Music session metadata, conditional checkpoints, recovery and portable import API.",
+  "description": "Authorized Music session commands, metadata, portable imports and reconnectable revision polling.",
   "type": "liberu-module",
   "license": "MIT",
   "version": "0.1.0",
@@ -16,7 +16,8 @@
     "illuminate/routing": "^13.38",
     "illuminate/validation": "^13.38",
     "liberusoftware/music-projects": "^0.1 || dev-main",
-    "laravel/sanctum": "^4.3"
+    "laravel/sanctum": "^4.3",
+    "illuminate/encryption": "^13.38"
   },
   "autoload": {
     "psr-4": {

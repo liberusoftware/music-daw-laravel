@@ -434,6 +434,11 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "changes_cursor": {
+                          "type": "string",
+                          "maxLength": 2048,
+                          "description": "Opaque revision-feed cursor for the exact snapshot returned."
                         }
                       }
                     }
@@ -1364,7 +1369,8 @@
           }
         ],
         "x-required-abilities": [
-          "music.projects.write"
+          "music.projects.write",
+          "music.projects.read"
         ],
         "requestBody": {
           "required": true,
@@ -1790,6 +1796,210 @@
           }
         }
       }
+    },
+    "/api/v1/music-projects/workspaces/{workspace}/sessions/{project}/changes": {
+      "get": {
+        "operationId": "musicProjectsChanges",
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,128}$"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page[size]",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "page[after]",
+            "in": "query",
+            "description": "Opaque encrypted cursor bound to this exact workspace/session and revision-feed format. A malformed, tampered or mismatched cursor returns 422; obtain a fresh authorized snapshot to resume.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          }
+        ],
+        "security": [
+          {
+            "sanctum": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/RevisionChangesPage"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "maxLength": 2048,
+                          "description": "Resume cursor, or null when an explicit resync is required."
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "required": [
+                        "snapshot"
+                      ],
+                      "properties": {
+                        "snapshot": {
+                          "type": "string",
+                          "format": "uri-reference",
+                          "description": "Authorized snapshot URL selecting the exact upper revision observed by this poll."
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed JSON or manifest.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or owner permission denied.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid fields or unsupported manifest schema.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited; honor Retry-After.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required core module disabled.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected platform failure. For a command, retry the exact request with its original key after recovery.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-required-abilities": [
+          "music.projects.read"
+        ],
+        "summary": "Poll ordered durable revision notifications and resume after reconnect",
+        "description": "Short polling query, not SSE or an audio clock. Without a cursor, start before the first revision. Reuse meta.next_cursor after successful polls, or meta.changes_cursor from an authorized full snapshot. On resync_required, do not apply partial changes: fetch links.snapshot, preserve local drafts for reconciliation, and resume from that snapshot cursor. If the exact snapshot is unavailable, surface recovery failure rather than inventing state. Honor Retry-After and use a normal polling interval of at least five seconds when idle."
+      }
     }
   },
   "components": {
@@ -2006,7 +2216,8 @@
                 "import_preview",
                 "checkpoint",
                 "recover",
-                "import"
+                "import",
+                "changes"
               ]
             ]
           },
@@ -2274,6 +2485,72 @@
           "manifest": {
             "type": "string",
             "maxLength": 17825792
+          }
+        }
+      },
+      "RevisionNotice": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "autosave",
+          "template",
+          "checksum",
+          "created_at"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "autosave": {
+            "type": "boolean"
+          },
+          "template": {
+            "type": "boolean"
+          },
+          "checksum": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC metadata time, never a sample-accurate timestamp."
+          }
+        }
+      },
+      "RevisionChangesPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "changes",
+          "latest_version",
+          "has_more",
+          "resync_required"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": 1
+          },
+          "changes": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/RevisionNotice"
+            }
+          },
+          "latest_version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "has_more": {
+            "type": "boolean"
+          },
+          "resync_required": {
+            "type": "boolean",
+            "description": "Sequence gap or cursor ahead of authoritative state. Changes are empty, next_cursor is null and the client must resynchronize from the exact snapshot link."
           }
         }
       }
