@@ -1,6 +1,6 @@
 # Music module repositories
 
-Status: under development. Projects core and Media Library core are installed from modules/ and synchronized to their separate repositories. Other Music packages remain planned. Track acceptance and remaining work in the [delivery roadmap](https://github.com/liberusoftware/project-music-daw-laravel-filament/issues/94); no complete DAW release is claimed.
+Status: under development. Projects core, Media Library core and the optional read/import-preview Projects API are installed from modules/ and synchronized to their separate repositories. The API is disabled by default and its write/stream scope remains unfinished. Other Music packages remain planned. Track acceptance and remaining work in the [delivery roadmap](https://github.com/liberusoftware/project-music-daw-laravel-filament/issues/94); no complete DAW release is claimed.
 
 22 documented capabilities × core, API, Livewire and Filament = 88 repositories.
 
