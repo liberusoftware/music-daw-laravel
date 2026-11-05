@@ -1982,29 +1982,47 @@
             "const": 1
           },
           "document_schema_versions": {
-            "const": [
-              1
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "examples": [
+              [
+                1
+              ]
             ]
           },
           "operations": {
-            "const": [
-              "browse",
-              "read",
-              "history",
-              "export",
-              "import_preview",
-              "checkpoint",
-              "recover",
-              "import"
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "examples": [
+              [
+                "browse",
+                "read",
+                "history",
+                "export",
+                "import_preview",
+                "checkpoint",
+                "recover",
+                "import"
+              ]
             ]
           },
           "unsupported": {
-            "const": [
-              "revision_stream",
-              "audio_execution",
-              "remote_transport",
-              "asset_transfer",
-              "async_jobs"
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "examples": [
+              [
+                "revision_stream",
+                "audio_execution",
+                "remote_transport",
+                "asset_transfer",
+                "async_jobs"
+              ]
             ]
           }
         }
