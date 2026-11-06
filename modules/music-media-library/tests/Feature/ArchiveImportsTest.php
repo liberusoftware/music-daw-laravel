@@ -357,3 +357,19 @@ it('protects a newer lease and lets a pending cancellation win when an old worke
         $this->travelBack();
     }
 })->with(['new lease', 'cancel']);
+
+it('requires a fresh request dispatch to reclaim an expired running lease', function () {
+    $this->jobs->request($this->actor, ($this->command)());
+    $original = ($this->job)();
+    ($this->pauseWorker)();
+    $before = ($this->row)();
+    $this->travel(76)->seconds();
+    $original->handle($this->jobs);
+    expect(($this->row)()->lease_nonce)->toBe($before->lease_nonce)
+        ->and(($this->row)()->attempt)->toBe($before->attempt);
+    $this->jobs->request($this->actor, ($this->command)());
+    $original->failed(new RuntimeException('delayed original failure'));
+    ($this->job)()->handle($this->jobs);
+    expect($this->jobs->get($this->actor, 'studio', $this->taskId)->status)->toBe('ready');
+    $this->travelBack();
+});

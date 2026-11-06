@@ -224,7 +224,7 @@ final readonly class ArchiveImports
         return $this->database->transaction(function () use ($taskId, $dispatchId, $timeoutSeconds): ?object {
             $row = $this->rows()->where('id', $taskId)->lockForUpdate()->firstOrFail();
             if (! in_array($row->status, ['queued', 'running'], true) || ($row->status === 'queued' && $row->dispatch_id !== $dispatchId)
-                || ($row->status === 'running' && ! $this->expired($row))) {
+                || ($row->status === 'running' && (! $this->expired($row) || ! $row->cancel_requested))) {
                 return null;
             }
             if ($row->cancel_requested) {
