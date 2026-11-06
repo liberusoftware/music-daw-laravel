@@ -6,6 +6,8 @@
 
 [![PHP](https://img.shields.io/badge/PHP-8.5-777BB4?logo=php&logoColor=white)](https://www.php.net/) [![Laravel](https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white)](https://laravel.com/) [![Filament](https://img.shields.io/badge/Filament-5-FDAE4B)](https://filamentphp.com/) [![Livewire](https://img.shields.io/badge/Livewire-4-FB70A9)](https://livewire.laravel.com/)
 
+[![Codecov](https://codecov.io/gh/liberusoftware/project-music-daw-laravel-filament/branch/main/graph/badge.svg)](https://codecov.io/gh/liberusoftware/project-music-daw-laravel-filament)
+
 ## What it is
 
 Liberu Music is the Laravel host skeleton for a proposed modular Digital Audio Workstation for songwriters, musicians, producers, composers and mix engineers. It starts from [Liberu Boilerplate](https://github.com/liberusoftware/project-boilerplate-laravel-filament/tree/95f445a2901f2296959bec24229c6a1d5d5a6815), preserving its application structure and shared foundation modules and themes.
