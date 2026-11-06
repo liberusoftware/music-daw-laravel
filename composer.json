@@ -468,7 +468,7 @@
         "liberusoftware/music-projects-livewire": "^0.1",
         "liberusoftware/notifications": "^1.0",
         "liberusoftware/observability": "^1.0",
-        "liberusoftware/organizations-teams": "^1.0",
+        "liberusoftware/organizations-teams": "^1.4.1",
         "liberusoftware/organizations-teams-filament": "^1.0",
         "liberusoftware/profiles": "^1.0",
         "liberusoftware/roles-permissions": "^1.0",

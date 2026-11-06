@@ -38,8 +38,9 @@ it('resolves the host workspace through foundation context and the actual actors
     $actor->forceFill(['current_team_id' => $team->id])->save();
     $actor->unsetRelation('currentTeam');
     expect($context->current($actor))->toBe((string) $team->id);
-    TenantContext::set(99);
-    expect($context->current($actor))->toBe('99');
+    $otherTeam = Team::factory()->create(['user_id' => $actor->id]);
+    TenantContext::set($otherTeam->id);
+    expect($context->current($actor))->toBe((string) $otherTeam->id);
     TenantContext::clear();
 });
 
