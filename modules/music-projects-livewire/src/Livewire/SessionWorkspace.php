@@ -23,6 +23,7 @@ use Liberu\Music\Projects\Exceptions\RevisionConflict;
 use Liberu\Music\Projects\MusicProjectsServiceProvider;
 use Liberu\Music\Projects\Services\ProjectSessions;
 use Liberu\Music\Projects\Services\SessionMetadata;
+use Liberu\Music\ProjectsLivewire\Contracts\WorkspaceScope;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -32,6 +33,9 @@ use Throwable;
 #[Layout('music-projects-livewire::layouts.workspace')]
 final class SessionWorkspace extends Component
 {
+    #[Locked]
+    public ?string $scope = null;
+
     #[Locked]
     public string $workspaceId;
 
@@ -95,9 +99,11 @@ final class SessionWorkspace extends Component
     #[Locked]
     public ?int $historyNext = null;
 
-    public function mount(string $workspace, ?string $project = null): void
+    public function mount(string $workspace, ?string $project = null, ?string $scope = null): void
     {
-        $this->actor();
+        $this->scope = $scope;
+        $this->workspaceId = $workspace;
+        $this->authorizeScope($this->actor());
         Validator::make(['workspace' => $workspace], ['workspace' => ['required', 'string', 'regex:/^[A-Za-z0-9_-]{1,128}$/D']])->validate();
         $this->workspaceId = $workspace;
         $this->resetDraft();
@@ -333,6 +339,13 @@ final class SessionWorkspace extends Component
         return $actor;
     }
 
+    private function authorizeScope(Authenticatable $actor): void
+    {
+        if ($this->scope !== null) {
+            app(WorkspaceScope::class)->authorize($actor, $this->workspaceId, $this->scope);
+        }
+    }
+
     private function resetDraft(): void
     {
         $this->projectId = (string) Str::uuid();
@@ -394,6 +407,8 @@ final class SessionWorkspace extends Component
             $this->resetValidation();
         }
         try {
+            $this->authorizeScope($actor);
+
             return $action($actor);
         } catch (ValidationException $exception) {
             $this->setErrorBag($exception->errors());

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schemas.liberu.dev/module/v1.json",
+  "name": "music-projects-filament",
+  "display_name": "Music Projects Filament",
+  "description": "Tenant-scoped Filament Music session administration with conditional recovery and portable manifests.",
+  "version": "0.1.0",
+  "category": "presentation",
+  "provider": "Liberu\\Music\\ProjectsFilament\\MusicProjectsFilamentServiceProvider",
+  "requires": {
+    "php": "^8.5",
+    "laravel": "^13.0",
+    "packages": {
+      "liberusoftware/music-projects": "^0.1 || dev-main",
+      "liberusoftware/music-projects-livewire": "^0.1 || dev-main"
+    }
+  },
+  "capabilities": [
+    "music.projects.filament"
+  ],
+  "default_enabled": false,
+  "features": [
+    "Current-workspace session administration",
+    "Reviewed conditional revision recovery",
+    "Portable session manifests and offline draft recovery"
+  ],
+  "presentation": {
+    "filament": {
+      "app": [
+        "Liberu\\Music\\ProjectsFilament\\MusicProjectsFilamentPlugin"
+      ],
+      "admin": [
+        "Liberu\\Music\\ProjectsFilament\\MusicProjectsFilamentPlugin"
+      ]
+    }
+  }
+}

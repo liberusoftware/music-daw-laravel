@@ -136,8 +136,32 @@ jobs:
           name: projects-livewire-coverage
           path: modules/music-projects-livewire/coverage/livewire.xml
 
+  music-projects-filament:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/music-projects-filament
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: intl, mbstring, pdo_sqlite
+          coverage: pcov
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: vendor/bin/phpstan analyse src --level=5 --no-progress --memory-limit=512M
+      - run: composer test:coverage -- --coverage-clover=coverage/filament.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: projects-livewire-coverage
+          path: modules/music-projects-filament/coverage/filament.xml
+
   music-projects-livewire-browser:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        surface: [livewire, filament]
     timeout-minutes: 15
     env:
       APP_ENV: testing
@@ -155,7 +179,8 @@ jobs:
       QUEUE_CONNECTION: sync
       MAIL_MAILER: array
       BCRYPT_ROUNDS: '4'
-      MODULES_ENABLED: music-projects-livewire
+      MODULES_ENABLED: ${{ matrix.surface == 'filament' && 'music-projects-livewire,music-projects-filament' || 'music-projects-livewire' }}
+      MUSIC_BROWSER_PATH: ${{ matrix.surface == 'filament' && '/app/music/sessions' || '' }}
       MUSIC_BROWSER_URL: http://127.0.0.1:8743
       MUSIC_BROWSER_EMAIL: browser-musician@example.test
       MUSIC_BROWSER_PASSWORD: Browser-Test-Password-42!
@@ -203,7 +228,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: projects-livewire-browser
+          name: projects-workspace-browser-${{ matrix.surface }}
           path: |
             ${{ github.workspace }}/music-browser-artifacts
             ${{ runner.temp }}/music-browser-server.log

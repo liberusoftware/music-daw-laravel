@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -10,6 +11,7 @@ use Liberu\Music\Projects\Commands\SaveSession;
 use Liberu\Music\Projects\Data\SessionDocument;
 use Liberu\Music\Projects\MusicProjectsServiceProvider;
 use Liberu\Music\Projects\Services\ProjectSessions;
+use Liberu\Music\ProjectsLivewire\Contracts\WorkspaceScope;
 use Liberu\Music\ProjectsLivewire\Livewire\SessionWorkspace;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
@@ -183,4 +185,26 @@ it('preserves opaque 64-bit state in version two backups and recovers legacy blo
     $draft['assets_json'] = '[]';
     $draft['modules_json'] = '{';
     $component->call('restoreDraft', json_encode($draft))->assertSee('not valid JSON');
+});
+
+it('denies an embedding scope without its owning adapter and locks the selected scope', function () {
+    Livewire::test(SessionWorkspace::class, ['workspace' => 'studio', 'scope' => 'unknown'])->assertForbidden();
+    expect(fn () => ($this->workspace)()->set('scope', 'forged'))->toThrow(CannotUpdateLockedPropertyException::class);
+});
+
+it('rechecks its embedding boundary before modifying a draft after the host context changes', function () {
+    $boundary = Mockery::mock(WorkspaceScope::class);
+    $boundary->shouldReceive('authorize')->andReturnUsing(function ($actor, $workspace, $scope) {
+        if ($scope !== 'panel' || config('test.current_workspace') !== $workspace) {
+            throw new AuthorizationException();
+        }
+    });
+    app()->instance(WorkspaceScope::class, $boundary);
+    config()->set('test.current_workspace', 'studio');
+    $component = Livewire::test(SessionWorkspace::class, ['workspace' => 'studio', 'scope' => 'panel'])
+        ->set('title', 'Keep this draft')->call('save')->assertSet('version', 1);
+    config()->set('test.current_workspace', 'other');
+    $component->set('title', 'Unsaved change')->call('save')->assertSet('version', 1)->assertSee('Access denied')
+        ->call('newSession')->assertSet('title', 'Unsaved change');
+    expect(DB::table('music_project_revisions')->count())->toBe(1);
 });

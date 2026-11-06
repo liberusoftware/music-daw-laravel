@@ -11,6 +11,7 @@ test('authenticated session editing, recovery and offline draft download/reconne
     const password = process.env.MUSIC_BROWSER_PASSWORD;
     assert.ok(base && email && password, 'Configure a disposable host using MUSIC_BROWSER_URL, MUSIC_BROWSER_EMAIL and MUSIC_BROWSER_PASSWORD.');
     const workspace = process.env.MUSIC_BROWSER_WORKSPACE ?? '1';
+    const workspacePath = process.env.MUSIC_BROWSER_PATH || `/music/workspaces/${encodeURIComponent(workspace)}/sessions`;
     const output = process.env.MUSIC_BROWSER_OUTPUT ?? 'browser-artifacts';
     await mkdir(output, { recursive: true });
     const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
@@ -26,7 +27,7 @@ test('authenticated session editing, recovery and offline draft download/reconne
         await page.locator('input[name="password"]').fill(password);
         await page.locator('button[type="submit"]').click();
         await page.waitForURL(url => !url.pathname.endsWith('/login'));
-        const response = await page.goto(`${base}/music/workspaces/${encodeURIComponent(workspace)}/sessions`);
+        const response = await page.goto(`${base}${workspacePath}`);
         assert.equal(response.status(), 200);
         assert.ok(response.headers()['cache-control'].includes('no-store'));
         await page.getByRole('heading', { name: 'Session draft', exact: true }).waitFor();

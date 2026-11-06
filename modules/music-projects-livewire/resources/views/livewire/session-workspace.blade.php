@@ -1,4 +1,5 @@
-<div x-data="{ backupError: '', draftText: '', draftName: '', manifestName: '', manifestError: '', manifestReading: false }">
+<div class="music-session-workspace" x-data="{ backupError: '', draftText: '', draftName: '', manifestName: '', manifestError: '', manifestReading: false }">
+    @include('music-projects-livewire::livewire.styles')
     <header class="row" style="justify-content:space-between;margin-bottom:1.5rem">
         <div><p class="muted">MUSIC · SESSION WORKSPACE</p><h1>Make room for your next idea.</h1><p class="muted">Workspace {{ $workspaceId }} · Session metadata and recovery</p></div>
         <div class="row"><button wire:click="newSession" wire:confirm="Replace the current draft? Download a draft backup first if you need to keep it.">New session</button><button wire:click="newSession(true)" wire:confirm="Replace the current draft with a new template?">New template</button></div>

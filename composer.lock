@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0396f8d771df7fdf8a163abc3db3fad1",
+    "content-hash": "4105914b16545174138fad4da3ec1d4c",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -6990,6 +6990,62 @@
                 "MIT"
             ],
             "description": "Authorized Music session commands, metadata, portable imports and reconnectable revision polling.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "liberusoftware/music-projects-filament",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "modules/music-projects-filament",
+                "reference": "5f5dd6077b9dec33766d6a8d507fe3e5abd681ec"
+            },
+            "require": {
+                "filament/filament": "^5.11",
+                "liberusoftware/music-projects": "^0.1 || dev-main",
+                "liberusoftware/music-projects-livewire": "^0.1 || dev-main",
+                "livewire/livewire": "^4.4",
+                "php": "^8.5",
+                "php-64bit": "^8.5"
+            },
+            "require-dev": {
+                "liberusoftware/package-testbench": "^1.8",
+                "pestphp/pest": "^5.3"
+            },
+            "type": "liberu-module",
+            "extra": {
+                "liberu": {
+                    "name": "music-projects-filament"
+                },
+                "laravel": {
+                    "providers": []
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Liberu\\Music\\ProjectsFilament\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Liberu\\Music\\ProjectsFilament\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ],
+                "test:coverage": [
+                    "pest --coverage --min=100"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Tenant-scoped Filament Music session administration with conditional recovery and portable manifests.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

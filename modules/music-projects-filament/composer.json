@@ -1,0 +1,59 @@
+{
+  "name": "liberusoftware/music-projects-filament",
+  "description": "Tenant-scoped Filament Music session administration with conditional recovery and portable manifests.",
+  "type": "liberu-module",
+  "license": "MIT",
+  "version": "0.1.0",
+  "repositories": [
+    {
+      "type": "git",
+      "url": "https://github.com/liberusoftware/module-music-projects"
+    },
+    {
+      "type": "git",
+      "url": "https://github.com/liberusoftware/module-music-projects-livewire"
+    }
+  ],
+  "require": {
+    "php": "^8.5",
+    "php-64bit": "^8.5",
+    "filament/filament": "^5.11",
+    "liberusoftware/music-projects": "^0.1 || dev-main",
+    "liberusoftware/music-projects-livewire": "^0.1 || dev-main",
+    "livewire/livewire": "^4.4"
+  },
+  "autoload": {
+    "psr-4": {
+      "Liberu\\Music\\ProjectsFilament\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Liberu\\Music\\ProjectsFilament\\Tests\\": "tests/"
+    }
+  },
+  "require-dev": {
+    "liberusoftware/package-testbench": "^1.8",
+    "pestphp/pest": "^5.3"
+  },
+  "extra": {
+    "liberu": {
+      "name": "music-projects-filament"
+    },
+    "laravel": {
+      "providers": []
+    }
+  },
+  "scripts": {
+    "test": "pest",
+    "test:coverage": "pest --coverage --min=100"
+  },
+  "config": {
+    "allow-plugins": {
+      "pestphp/pest-plugin": true
+    },
+    "github-protocols": [
+      "https"
+    ]
+  }
+}
