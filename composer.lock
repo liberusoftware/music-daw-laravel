@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "2ee6584c5ac330b005286ac62a18ee70",
+    "content-hash": "afb9638ba7a28d677e40fe93d3a69b56",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -6761,6 +6761,61 @@
                 "MIT"
             ],
             "description": "Filament operations presentation adapter for the Liberu Module Manager.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "liberusoftware/music-audio-engine",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "modules/music-audio-engine",
+                "reference": "bca4afd5d7dc3b300304a2085df310b6696b8811"
+            },
+            "require": {
+                "illuminate/support": "^13.38",
+                "illuminate/validation": "^13.38",
+                "liberusoftware/music-projects": "^0.1 || dev-main",
+                "php": "^8.5",
+                "php-64bit": "^8.5"
+            },
+            "require-dev": {
+                "liberusoftware/package-testbench": "^1.8",
+                "pestphp/pest": "^5.3"
+            },
+            "type": "liberu-module",
+            "extra": {
+                "liberu": {
+                    "name": "music-audio-engine"
+                },
+                "laravel": {
+                    "providers": []
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Liberu\\Music\\AudioEngine\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Liberu\\Music\\AudioEngine\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ],
+                "test:coverage": [
+                    "pest --coverage --min=100"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Versioned Music engine graphs and project-pinned native handoff metadata.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

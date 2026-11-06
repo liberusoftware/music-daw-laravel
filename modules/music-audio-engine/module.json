@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schemas.liberu.dev/module/v1.json",
+  "name": "music-audio-engine",
+  "display_name": "Music Audio Engine",
+  "description": "Versioned Music engine graphs and project-pinned native handoff metadata.",
+  "version": "0.1.0",
+  "category": "product",
+  "provider": "Liberu\\Music\\AudioEngine\\MusicAudioEngineServiceProvider",
+  "requires": {
+    "php": "^8.5",
+    "laravel": "^13.0",
+    "packages": {
+      "liberusoftware/music-projects": "^0.1 || dev-main"
+    }
+  },
+  "capabilities": [
+    "music.audio-engine.graphs"
+  ],
+  "default_enabled": false,
+  "features": [
+    "Versioned engine graph metadata",
+    "Project-pinned graph handoff snapshots",
+    "Declared latency compensation plans"
+  ]
+}
