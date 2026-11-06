@@ -1,5 +1,11 @@
 # Changelog
 
+## Queued archive import orchestration
+
+- Add owned after-commit import jobs with canonical actor checks, resumable audio progress, worker leases and cooperative cancellation.
+- Commit final pack publication and task acknowledgement atomically while retaining independent verified upload commits.
+- Cover late workers, cancellation, acknowledgement failure, real queue execution and host round trips. HTTP intake/import routes remain unfinished.
+
 ## Unreleased
 
 - Add purpose-bound resumable archive intake using the existing quarantine and reservation ledger, with owned scanner/checksum-verified snapshots.

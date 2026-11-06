@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Liberu\Music\MediaLibrary\Services;
 
+use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\ConnectionInterface;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Liberu\Music\MediaLibrary\Commands\SaveMediaPack;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
+use Liberu\Music\MediaLibrary\Contracts\ArchiveImportControl;
 use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\Contracts\ZipArchiveFactory;
 use Liberu\Music\MediaLibrary\Data\ArchiveTransfer;
@@ -108,9 +110,9 @@ final readonly class PackArchives
     }
 
     /** @param resource $source */
-    public function importFrom(Authenticatable $actor, string $workspaceId, string $packId, mixed $source, array $assetMap, string $commandKey): MediaPack
+    public function importFrom(Authenticatable $actor, string $workspaceId, string $packId, mixed $source, array $assetMap, string $commandKey, ?ArchiveImportControl $control = null): MediaPack
     {
-        $this->access->authorize($actor, $workspaceId, $packId, 'pack_import');
+        $this->packs->authorizeImport($actor, $workspaceId, $packId);
         $this->assertStream($source, false);
         $archive = tmpfile() ?: throw new RuntimeException('Private archive staging is unavailable.');
         try {
@@ -155,19 +157,27 @@ final readonly class PackArchives
                         $commands[] = new StartUpload($workspaceId, $id, $asset['name'], $entries[$entry], $asset['reference']['sha256'], $asset['provenance']);
                     }
                 }
+                $completed = 0;
+                $total = count($pack->assets);
+                $control?->checkpoint($completed, $total);
                 if ($commands !== []) {
                     $this->uploads->startBatch($actor, $commands);
                 }
                 foreach ($pack->assets as $asset) {
+                    $control?->checkpoint($completed, $total);
                     $id = $assetMap[$asset['reference']['id']];
                     $entry = 'assets/'.$asset['reference']['sha256'].'.wav';
                     if (! isset($existing[$id]) || $existing[$id]->status !== 'ready') {
-                        $this->receive($actor, $workspaceId, $id, $zip, $entry, $entries[$entry]);
+                        $this->receive($actor, $workspaceId, $id, $zip, $entry, $entries[$entry], $control === null ? null : fn () => $control->checkpoint($completed, $total));
                     }
+                    $control?->checkpoint($completed, $total);
                     $this->uploads->complete($actor, $workspaceId, $id);
+                    $control?->checkpoint(++$completed, $total);
                 }
 
-                return $this->packs->import($actor, $workspaceId, $packId, $manifest, $assetMap, $commandKey);
+                $publish = fn () => $this->packs->import($actor, $workspaceId, $packId, $manifest, $assetMap, $commandKey);
+
+                return $control === null ? $publish() : $control->publish($publish);
             } finally {
                 $zip->close();
             }
@@ -258,12 +268,13 @@ final readonly class PackArchives
         }
     }
 
-    private function receive(Authenticatable $actor, string $workspaceId, string $uploadId, ZipArchive $zip, string $entry, int $bytes): void
+    private function receive(Authenticatable $actor, string $workspaceId, string $uploadId, ZipArchive $zip, string $entry, int $bytes, ?Closure $checkpoint = null): void
     {
         $source = $zip->getStream($entry) ?: throw new InvalidAudio('An archived audio stream is unavailable.');
         try {
             $offset = 0;
             while ($offset < $bytes) {
+                $checkpoint?->__invoke();
                 $chunk = @fread($source, min(1048576, $bytes - $offset));
                 if ($chunk === false || $chunk === '') {
                     throw new InvalidAudio('The archived audio stream is incomplete.');

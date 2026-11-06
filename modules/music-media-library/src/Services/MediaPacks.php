@@ -123,9 +123,14 @@ final readonly class MediaPacks
             'checksum' => hash('sha256', json_encode($pack, JSON_THROW_ON_ERROR))], JSON_THROW_ON_ERROR);
     }
 
-    public function previewImport(Authenticatable $actor, string $workspaceId, string $packId, string $manifest, array $assetMap): MediaPack
+    public function authorizeImport(Authenticatable $actor, string $workspaceId, string $packId): void
     {
         $this->authorizeTransfer($actor, $workspaceId, $packId, 'import');
+    }
+
+    public function previewImport(Authenticatable $actor, string $workspaceId, string $packId, string $manifest, array $assetMap): MediaPack
+    {
+        $this->authorizeImport($actor, $workspaceId, $packId);
         if (strlen($manifest) > self::MAX_DOCUMENT_BYTES * 2) {
             throw ValidationException::withMessages(['manifest' => 'The pack manifest exceeds its size limit.']);
         }
