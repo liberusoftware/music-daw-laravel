@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Document the optional archive export HTTP consumer and distinguish remaining queued import scope.
+
 - Add durable canonical-requester pack ZIP export tasks, private checksum-verified results, expiry and bounded operator cleanup.
 - Serialize export publication/cancellation and retain task-owned private staging for safe retry after interrupted acknowledgement.
 
