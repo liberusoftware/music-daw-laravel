@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Support\AuditedSessionRevisions;
+use App\Support\ClamAvScanner;
 use App\Support\MusicWorkspaceContext;
 use App\Support\UploadedSessionMedia;
 use App\Support\UploadedSessionRetention;
@@ -10,7 +11,9 @@ use App\Support\WorkspaceMediaAuthorizer;
 use App\Support\WorkspacePackDistribution;
 use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Support\ServiceProvider;
+use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Foundation\Files\Contracts\MediaAccess;
+use Liberu\Foundation\Files\Support\RejectingMalwareScanner;
 use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\Contracts\PackDistributionPolicy;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
@@ -33,6 +36,7 @@ final class MusicModuleIntegrationProvider extends ServiceProvider
     public function boot(): void
     {
         if ($this->app->getProvider(MusicMediaLibraryServiceProvider::class) !== null) {
+            $this->app->bind(MalwareScanner::class, config('music-scanner.driver') === 'clamav' ? ClamAvScanner::class : RejectingMalwareScanner::class);
             $this->app->bind(MediaAuthorizer::class, WorkspaceMediaAuthorizer::class);
             $this->app->bind(PackDistributionPolicy::class, WorkspacePackDistribution::class);
         }

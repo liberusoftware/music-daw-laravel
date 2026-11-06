@@ -20,6 +20,10 @@ jobs:
           extensions: bcmath, gd, intl, mbstring, pdo_sqlite, zip
           coverage: pcov
       - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Install real scanner test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends clamav libfaketime
       - run: composer test:coverage -- --coverage-clover=coverage/host.xml
       - uses: actions/upload-artifact@v4
         if: always()
