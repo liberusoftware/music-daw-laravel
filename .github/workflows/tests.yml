@@ -25,7 +25,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends clamav libfaketime
       - run: composer test:coverage -- --coverage-clover=coverage/host.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: host-coverage
@@ -45,7 +45,7 @@ jobs:
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: vendor/bin/phpstan analyse src --level=5 --no-progress
       - run: composer test:coverage -- --coverage-clover=coverage/module-manager.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: module-manager-coverage
@@ -65,7 +65,7 @@ jobs:
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: vendor/bin/phpstan analyse src --level=5 --no-progress --memory-limit=512M
       - run: composer test:coverage -- --coverage-clover=coverage/audio-engine.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: audio-engine-coverage
@@ -84,7 +84,7 @@ jobs:
           coverage: pcov
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: composer test:coverage -- --coverage-clover=coverage/projects.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: projects-coverage
@@ -103,7 +103,7 @@ jobs:
           coverage: pcov
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: composer test:coverage -- --coverage-clover=coverage/media.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: media-coverage
@@ -128,7 +128,7 @@ jobs:
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: vendor/bin/phpstan analyse src --level=5 --no-progress --memory-limit=512M
       - run: composer test:coverage -- --coverage-clover=coverage/api.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: projects-api-coverage
@@ -153,7 +153,7 @@ jobs:
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: vendor/bin/phpstan analyse src --level=5 --no-progress --memory-limit=512M
       - run: composer test:coverage -- --coverage-clover=coverage/api.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: media-api-coverage
@@ -174,7 +174,7 @@ jobs:
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: vendor/bin/phpstan analyse src --level=5 --no-progress --memory-limit=512M
       - run: composer test:coverage -- --coverage-clover=coverage/livewire.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: projects-livewire-coverage
@@ -195,7 +195,7 @@ jobs:
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: vendor/bin/phpstan analyse src --level=5 --no-progress --memory-limit=512M
       - run: composer test:coverage -- --coverage-clover=coverage/filament.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: projects-livewire-coverage
@@ -269,7 +269,7 @@ jobs:
         run: php artisan serve --host=127.0.0.1 --port=8743 --no-reload > "$RUNNER_TEMP/music-browser-server.log" 2>&1 &
       - run: curl --retry 30 --retry-connrefused --retry-delay 1 --silent --fail "$MUSIC_BROWSER_URL/login" > /dev/null
       - run: npm --prefix modules/music-projects-livewire run test:browser
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: projects-workspace-browser-${{ matrix.surface }}
