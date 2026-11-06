@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Database\RecordNotFoundException;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -14,6 +15,7 @@ use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Services\ArchiveExports;
 use Liberu\Music\MediaLibrary\Services\MediaPacks;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
+use Liberu\Music\MediaLibrary\Services\PackArchives;
 use Liberu\Music\MediaLibraryApi\MusicMediaLibraryApiServiceProvider;
 
 it('exports a reviewed pack on a canonical host worker and expires only its private artifact', function () {
@@ -24,12 +26,12 @@ it('exports a reviewed pack on a canonical host worker and expires only its priv
     config()->set('music-media.disk', 'host-queued-archive');
     $disk = Storage::fake('host-queued-archive');
     $actor = User::factory()->create();
-    foreach (['upload', 'read', 'retain', 'pack_write', 'pack_read', 'pack_export', 'distribute', 'archive_cleanup'] as $operation) {
+    foreach (['upload', 'read', 'retain', 'pack_write', 'pack_read', 'pack_export', 'pack_import', 'distribute', 'archive_cleanup'] as $operation) {
         Gate::define('music.media.'.$operation, fn ($user, $workspace) => $user->getKey() === $actor->getKey() && $workspace === 'studio');
     }
     Gate::define('music.media.pack_distribute', fn ($user, $pack) => $user->getKey() === $actor->getKey() && $pack->workspaceId === 'studio');
     app()->instance(MalwareScanner::class, Mockery::mock(MalwareScanner::class)->shouldReceive('clean')->andReturnTrue()->getMock());
-    app()->instance(TransferAuthorizer::class, Mockery::mock(TransferAuthorizer::class)->shouldReceive('allowed')->with((string) $actor->getKey(), 'music-media-pack', 'export')->andReturnTrue()->getMock());
+    app()->instance(TransferAuthorizer::class, Mockery::mock(TransferAuthorizer::class)->shouldReceive('allowed')->with((string) $actor->getKey(), 'music-media-pack', Mockery::any())->andReturnTrue()->getMock());
     Bus::fake();
     $format = pack('vvVVvv', 1, 1, 48000, 96000, 2, 16);
     $data = 'fmt '.pack('V', 16).$format.'data'.pack('V', 4).pack('v*', 0, 16384);
@@ -55,8 +57,23 @@ it('exports a reviewed pack on a canonical host worker and expires only its priv
     $receipt = $this->getJson($taskUrl.'/result')->assertSuccessful()->assertJsonPath('data.media_objects', 1);
     $grant = $this->getJson($receipt->json('links.download_url'))->assertSuccessful();
     $response = $this->get($grant->json('data.url'))->assertSuccessful()->assertHeader('Content-Type', 'application/zip');
-    expect(hash('sha256', $response->streamedContent()))->toBe($receipt->json('data.sha256'));
+    $zipBytes = $response->streamedContent();
+    expect(hash('sha256', $zipBytes))->toBe($receipt->json('data.sha256'));
     $this->getJson($taskUrl)->assertSuccessful()->assertJsonPath('data.status', 'ready');
+    $inputId = (string) Str::uuid();
+    $uploads->start($actor, new StartUpload('studio', $inputId, 'Transfer.zip', strlen($zipBytes), hash('sha256', $zipBytes), purpose: 'archive'));
+    $uploads->append($actor, 'studio', $inputId, 0, substr($zipBytes, 0, 20));
+    $uploads->append($actor, 'studio', $inputId, 20, substr($zipBytes, 20));
+    $input = $uploads->openArchive($actor, 'studio', $inputId);
+    $importedAsset = (string) Str::uuid();
+    try {
+        $importedPack = app(PackArchives::class)->importFrom($actor, 'studio', (string) Str::uuid(), $input, [$asset => $importedAsset], 'round-trip');
+    } finally {
+        fclose($input);
+    }
+    expect($importedPack->version)->toBe(1)->and($uploads->get($actor, 'studio', $importedAsset)->reference()['sha256'])->toBe(hash('sha256', $bytes));
+    expect(fn () => $uploads->get($actor, 'studio', $inputId))->toThrow(RecordNotFoundException::class);
+    $uploads->cancel($actor, 'studio', $inputId);
     $this->travel(3601)->seconds();
     expect(fn () => $jobs->open($actor, 'studio', $taskId))->toThrow(ArchiveResultExpired::class);
     expect($jobs->cleanup($actor, 'studio'))->toBe(1)->and($jobs->get($actor, 'studio', $taskId)->status)->toBe('expired')
