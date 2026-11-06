@@ -7,6 +7,7 @@ use Liberu\Foundation\ModuleManager\Exceptions\DependencyResolutionFailed;
 use Liberu\Foundation\ModuleManager\Exceptions\InvalidManifest;
 use Liberu\Foundation\ModuleManager\Manifest;
 use Liberu\Foundation\ModuleManager\ModuleDiscovery;
+use Liberu\Foundation\ModuleManager\ModuleManagerServiceProvider;
 use Liberu\Foundation\ModuleManager\ModuleRegistry;
 use Liberu\Foundation\ModuleManager\ModuleValidationGuard;
 use Liberu\Foundation\ModuleManager\ModuleValidator;
@@ -202,4 +203,20 @@ it('returns a failing deployment command status when package installation metada
     $module = ($this->makeModule)('music-uninstalled');
     $this->app->instance(ModuleRegistry::class, new ModuleRegistry(['music-uninstalled' => $module]));
     $this->artisan('module:validate')->expectsOutputToContain('Composer package is not installed.')->assertExitCode(1);
+});
+
+it('clears a damaged deployment cache before resolving the host registry for its recovery command', function () {
+    $path = $this->moduleRoot.'/damaged.cache';
+    $this->files->put($path, serialize(new stdClass()));
+    config()->set('modules.cache', true);
+    config()->set('modules.cache_path', $path);
+    $arguments = $_SERVER['argv'] ?? [];
+    $_SERVER['argv'] = ['artisan', 'module:clear'];
+    try {
+        (new ModuleManagerServiceProvider($this->app))->register();
+        expect($this->files->exists($path))->toBeFalse()
+            ->and(app(ModuleRegistry::class)->has('music-projects'))->toBeTrue();
+    } finally {
+        $_SERVER['argv'] = $arguments;
+    }
 });

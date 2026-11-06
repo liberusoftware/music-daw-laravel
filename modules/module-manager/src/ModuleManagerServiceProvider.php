@@ -11,6 +11,7 @@ use Liberu\Foundation\ModuleManager\Console\ListFeaturesCommand;
 use Liberu\Foundation\ModuleManager\Console\ListModulesCommand;
 use Liberu\Foundation\ModuleManager\Console\ModuleStatusCommand;
 use Liberu\Foundation\ModuleManager\Console\ValidateModulesCommand;
+use Symfony\Component\Console\Input\ArgvInput;
 
 final class ModuleManagerServiceProvider extends ServiceProvider
 {
@@ -18,6 +19,13 @@ final class ModuleManagerServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/modules.php', 'modules');
         $this->app->singleton(RegistryCache::class);
+
+        // Recovery must remove a corrupt cache before normal provider loading
+        // tries to deserialize it. Other commands continue to fail closed.
+        if ($this->app->runningInConsole() && (new ArgvInput())->getFirstArgument() === 'module:clear') {
+            $this->app->make(RegistryCache::class)->clear((string) config('modules.cache_path'));
+        }
+
         $this->app->singleton(ModuleRegistry::class, fn () => $this->app->make(RegistryCache::class)->load(
             (array) config('modules.paths', [base_path('modules')]),
             (bool) config('modules.cache', false),

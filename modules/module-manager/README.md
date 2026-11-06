@@ -96,3 +96,11 @@ Focused issues and tested pull requests are welcome in the [GitHub repository](h
 ## Contributors
 
 Thank you to everyone who helps improve Liberu. [View the contributors graph](https://github.com/liberusoftware/module-module-manager/graphs/contributors).
+
+## Deployment cache recovery in the 1.4 maintenance line
+
+Version 1.4.8 preserves the strict Composer/manifest validation of the 1.4 line. `php artisan module:clear` removes the configured registry cache before normal provider discovery attempts to load it. This permits recovery from malformed serialized data while Laravel configuration caching is enabled. Leading console flags such as `--no-interaction` and `--env=production` are supported.
+
+Normal requests and other commands still reject corrupt registry data. After removal, the application rediscovers installed manifests and performs its usual dependency and version validation. Invalid source manifests still require correction before a healthy boot. Rebuild the deployment registry after correcting configuration, then restart long-lived application/queue workers. Clearing this registry does not clear Laravel's configuration cache or delete domain data.
+
+The maintenance source is synchronized on `music-cache-recovery-1.4`. Run `composer test:coverage` for the enforced 100% package source line-coverage gate.

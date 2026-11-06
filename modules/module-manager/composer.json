@@ -7,7 +7,8 @@
     "php": "^8.5",
     "composer/semver": "^3.5.2",
     "illuminate/contracts": "^13.38.0",
-    "illuminate/support": "^13.38.0"
+    "illuminate/support": "^13.38.0",
+    "symfony/console": "^8.0"
   },
   "autoload": {
     "psr-4": {
@@ -19,7 +20,7 @@
       "name": "module-manager"
     }
   },
-  "version": "1.4.2",
+  "version": "1.4.8",
   "autoload-dev": {
     "psr-4": {
       "Liberu\\Foundation\\ModuleManager\\Tests\\": "tests/"
@@ -30,7 +31,8 @@
     "pestphp/pest": "^5.3.3"
   },
   "scripts": {
-    "test": "pest"
+    "test": "pest",
+    "test:coverage": "pest --coverage --min=100"
   },
   "config": {
     "allow-plugins": {

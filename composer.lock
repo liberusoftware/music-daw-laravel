@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "88855062a8e2dc2751d02ac2071cdf37",
+    "content-hash": "2ee6584c5ac330b005286ac62a18ee70",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -6668,17 +6668,18 @@
         },
         {
             "name": "liberusoftware/module-manager",
-            "version": "1.4.2",
+            "version": "1.4.8",
             "dist": {
                 "type": "path",
                 "url": "modules/module-manager",
-                "reference": "70736e664152377e341c0e2dbfc2438d26b39b69"
+                "reference": "baa2a6542cb4b32160090962f170e9bdb5c34b24"
             },
             "require": {
                 "composer/semver": "^3.5.2",
                 "illuminate/contracts": "^13.38.0",
                 "illuminate/support": "^13.38.0",
-                "php": "^8.5"
+                "php": "^8.5",
+                "symfony/console": "^8.0"
             },
             "require-dev": {
                 "liberusoftware/package-testbench": "^1.5",
@@ -6703,6 +6704,9 @@
             "scripts": {
                 "test": [
                     "pest"
+                ],
+                "test:coverage": [
+                    "pest --coverage --min=100"
                 ]
             },
             "license": [

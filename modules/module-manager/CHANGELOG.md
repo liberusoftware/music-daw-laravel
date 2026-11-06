@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.8 — maintenance
+
+- Clear a corrupt registry before provider loading for the explicit `module:clear` recovery command.
+- Preserve fail-closed behavior for other commands and normal requests, including cached Laravel configuration.
+- Add console deployment and recovery coverage; enforce 100% package source line coverage.
+
 ## 1.2.1 - 2026-08-06
 
 - Split CI into the three workflows `CONFORMANCE.md` §3.9 asks for, rather than one calling all

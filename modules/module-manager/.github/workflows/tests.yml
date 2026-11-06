@@ -2,7 +2,7 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, music-cache-recovery-1.4]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -19,4 +19,4 @@ jobs:
     uses: liberusoftware/.github/.github/workflows/package-tests.yml@75d1786646b095ba49360f735f27e0b2fa932b8d # main
     with:
       phpstan-level: 5
-      coverage-threshold: 80
+      coverage-threshold: 100
