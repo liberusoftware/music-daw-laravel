@@ -6831,7 +6831,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library-api",
-                "reference": "a446c3de73d45f3f544915f49fc5248cd35e2f61"
+                "reference": "4e2e6c19b84d6ef054f96d3b07959385cf02f363"
             },
             "require": {
                 "illuminate/encryption": "^13.38",
@@ -6876,7 +6876,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Authorized Music transfers, rights manifests, offline pins and reference-safe trash/recovery APIs.",
+            "description": "Authorized Music transfers, queued private ZIP exports, rights manifests, offline pins and recovery APIs.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

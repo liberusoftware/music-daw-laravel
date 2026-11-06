@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
+use Liberu\Music\MediaLibraryApi\Http\Controllers\ArchiveExportsController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\AssetTasksController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\DownloadsController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\LifecycleController;
@@ -17,6 +18,12 @@ use Liberu\Music\MediaLibraryApi\Http\Middleware\RequireMedia;
 Route::prefix('api/v1/music-media/workspaces/{workspace}')->where(['workspace' => '[A-Za-z0-9_-]{1,128}'])
     ->name('music.media.api.')->middleware([ApiBoundary::class, 'auth:sanctum', RequireMedia::class, 'throttle:60,1'])->group(function () {
         Route::middleware(CheckAbilities::class.':music.media.read')->group(function () {
+            Route::put('/packs/{pack}/archive-export-tasks/{task}', [ArchiveExportsController::class, 'request'])->whereUuid('task')->whereUuid('pack')->middleware(CheckAbilities::class.':music.media.packs.export,music.media.archives.export')->name('archive-export-request');
+            Route::get('/archive-export-tasks/{task}', [ArchiveExportsController::class, 'show'])->whereUuid('task')->middleware(CheckAbilities::class.':music.media.packs.export,music.media.archives.export')->name('archive-export');
+            Route::delete('/archive-export-tasks/{task}', [ArchiveExportsController::class, 'cancel'])->whereUuid('task')->middleware(CheckAbilities::class.':music.media.packs.export,music.media.archives.export')->name('archive-export-cancel');
+            Route::get('/archive-export-tasks/{task}/result', [ArchiveExportsController::class, 'result'])->whereUuid('task')->middleware(CheckAbilities::class.':music.media.packs.export,music.media.archives.export')->name('archive-export-result');
+            Route::get('/archive-export-tasks/{task}/download-url', [ArchiveExportsController::class, 'issue'])->whereUuid('task')->middleware(CheckAbilities::class.':music.media.packs.export,music.media.archives.export')->name('archive-download-url');
+            Route::get('/archive-export-tasks/{task}/download', [ArchiveExportsController::class, 'download'])->whereUuid('task')->middleware(CheckAbilities::class.':music.media.packs.export,music.media.archives.export')->name('archive-download');
             Route::get('/trash', [LifecycleController::class, 'browse'])->middleware(CheckAbilities::class.':music.media.trash.read')->name('trash');
             Route::put('/trash-commands/{command}', [LifecycleController::class, 'trash'])->whereUuid('command')->middleware(CheckAbilities::class.':music.media.trash.write')->name('trash-command');
             Route::put('/assets/{asset}/trash-recovery-tasks/{task}', [TrashRecoveryController::class, 'request'])->whereUuid('asset')->whereUuid('task')->middleware(CheckAbilities::class.':music.media.restore')->name('trash-recovery-request');

@@ -2,7 +2,7 @@
 
 Optional Laravel HTTP adapter for `liberusoftware/music-media-library`. The module is disabled by default. It invokes the core's public commands, query DTOs and policies; it owns no audio, identity or domain persistence.
 
-This is an **incomplete module increment**, not the full Media Library API release. The OpenAPI 3.1 contract in [openapi/media.json](openapi/media.json) covers verified metadata, keyset browsing, conditional metadata edits, authenticated resumable upload intake, queued verification/restoration/waveform tasks, short-lived scoped downloads and versioned rights/provenance pack manifests. Queued audio archive transfers and production operational integrations remain to be implemented. Capability discovery advertises these limitations. The complete core/API/Filament/Livewire DAW scope remains open.
+This is an **incomplete module increment**, not the full Media Library API release. The OpenAPI 3.1 contract in [openapi/media.json](openapi/media.json) covers verified metadata, keyset browsing, conditional metadata edits, authenticated resumable upload intake, queued verification/restoration/waveform tasks, short-lived scoped downloads, versioned rights/provenance pack manifests and queued private ZIP exports. Queued resumable archive import and production operational integrations remain to be implemented. Capability discovery advertises these limitations. The complete core/API/Filament/Livewire DAW scope remains open.
 
 ## Installation and host configuration
 
@@ -135,3 +135,20 @@ Responses include the Core pin receipt and quoted version ETag. Conflicting key 
 `PUT assets/{asset}/trash-recovery-tasks/{task}` requires `music.media.read`, `music.media.restore` and matching UUID Idempotency-Key. Core queues an actor-owned recovery task after commit. GET `trash-recovery-tasks/{task}` reads status, GET its `/result` returns 202/Retry-After while queued or a currently available verified asset reference when ready, and DELETE cancels a queued task using the same key. All routes recheck live read/restore policies; workers resolve the canonical requester again. Failed/cancelled results return 409; failures expose a safe code. Same-command failed retries may requeue; cancelled and ready identities never reopen.
 
 Recovery and cancellation serialize on the task record. Recovery validates original private audio and commits its publication and task acknowledgement in one transaction; a failed acknowledgement rolls back both. Cancellation does not interrupt CPU already holding the lock: it waits, then conflicts if publication won. A queued task does not extend trash grace or prevent operator GC; recovery fails safely if bytes were purged, missing or corrupt. Queue workers must use retry_after greater than the 60 second job timeout. Physical garbage collection stays in the trusted Core operator workflow; these routes do not expose purge, storage discovery or arbitrary filesystem operations.
+
+### Queued private archive exports
+
+All archive routes require `music.media.read`, `music.media.packs.export` and `music.media.archives.export`, current Core pack/asset distribution policies and foundation transfer approval for `music-media-pack` / `export`. Tasks belong to the authenticated actor inside the workspace. A manifest-export token alone does not authorize archive bytes.
+
+| Method and workspace-relative route | Contract |
+| --- | --- |
+| PUT `packs/{pack}/archive-export-tasks/{task}` | Supply an explicit integer `version` and matching task UUID Idempotency-Key. Returns 202 while queued; replay returns its original task. No If-Match is needed because this reads an immutable pack revision. |
+| GET `archive-export-tasks/{task}` | Current owned task status, bounded progress, safe error code and result expiry. |
+| DELETE `archive-export-tasks/{task}` | Matching task UUID Idempotency-Key cancels queued work. Cancellation and publication serialize; terminal tasks cannot be cancelled. |
+| GET `archive-export-tasks/{task}/result` | 202 with Retry-After while queued, verified transfer receipt when ready, 409 for failed/cancelled and 410 for expired artifacts. |
+| GET `archive-export-tasks/{task}/download-url` | Signed actor/checksum-bound URL valid for at most 60 seconds, capped at artifact expiry. A valid URL still requires a current authorized bearer token. |
+| GET `archive-export-tasks/{task}/download` | Full private ZIP attachment with checksum ETag, Content-Length, no-store and nosniff headers. Range requests return 416. |
+
+Workers use the canonical requester and recheck rights before generating a bounded archive. Result/status reads and downloads recheck current policies too. Core verifies the full ZIP size/checksum into a private disk snapshot before successful binary headers; missing/corrupt artifacts fail closed. Temporary disk/time scale with archive size while PHP memory remains bounded. Issuing a URL authorizes retrieval but cannot guarantee storage availability at redemption. Tokens can be revoked immediately; an already streaming response cannot be recalled.
+
+Artifacts expire one hour after generation and cannot be reopened with the same task identity. Failed same-command retries can requeue; cancelled/ready/expired identities remain terminal. A queue-dispatch outage after SQL commit leaves a queued task which the same command can safely redispatch. Operator cleanup remains the Core public action described in its README; no HTTP cleanup/purge endpoint is exposed. Existing synchronous manifest import does not accept ZIP/audio bytes, and queued resumable ZIP import remains unsupported.

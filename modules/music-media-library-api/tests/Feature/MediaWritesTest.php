@@ -1,7 +1,9 @@
 <?php
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Access\Gate;
 use Illuminate\Contracts\Auth\UserProvider;
+use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Carbon;
@@ -14,9 +16,12 @@ use Laravel\Sanctum\Sanctum;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Foundation\ImportExport\Contracts\TransferAuthorizer;
 use Liberu\Music\MediaLibrary\Commands\RetainAssets;
+use Liberu\Music\MediaLibrary\Commands\SaveMediaPack;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
+use Liberu\Music\MediaLibrary\Services\ArchiveExports;
 use Liberu\Music\MediaLibrary\Services\AssetProcessing;
+use Liberu\Music\MediaLibrary\Services\MediaPacks;
 use Liberu\Music\MediaLibrary\Services\MediaRetention;
 use Liberu\Music\MediaLibrary\Services\TrashRecovery;
 use Liberu\Music\MediaLibraryApi\Http\Middleware\ApiBoundary;
@@ -589,5 +594,162 @@ describe('reference-safe trash and queued recovery', function () {
         $this->getJson($this->base.'/trash')->assertForbidden();
         $this->denied = 'trash';
         ($this->trash)([$second])->assertForbidden();
+    });
+});
+
+describe('queued private archive exports', function () {
+    beforeEach(function () {
+        $this->rights = ['source' => 'Studio originals', 'license' => 'CC-BY-4.0', 'attribution' => 'Artist'];
+        $this->declaration['provenance'] = $this->rights;
+        foreach (['pack_read', 'pack_write', 'pack_export', 'distribute'] as $operation) {
+            app(Gate::class)->define('music.media.'.$operation, fn ($actor, $workspace) => $actor->id === 7 && in_array($workspace, ['studio', 'other']) && $this->denied !== $operation);
+        }
+        app(Gate::class)->define('music.media.pack_distribute', fn () => $this->denied !== 'pack_distribute');
+        $this->transferAllowed = true;
+        app()->instance(TransferAuthorizer::class, Mockery::mock(TransferAuthorizer::class)->shouldReceive('allowed')->with('7', 'music-media-pack', 'export')->andReturnUsing(fn () => $this->transferAllowed)->getMock());
+        app()->when(ArchiveExports::class)->needs(UserProvider::class)->give(fn () => Mockery::mock(UserProvider::class)->shouldReceive('retrieveById')->with('7')->andReturn($this->actor)->getMock());
+        $this->scopes = ['music.media.read', 'music.media.upload', 'music.media.packs.export', 'music.media.archives.export'];
+        Sanctum::actingAs($this->actor, $this->scopes);
+        $this->asset = ($this->publish)();
+        $this->pack = (string) Str::uuid();
+        app(MediaPacks::class)->save($this->actor,
+            new SaveMediaPack('studio', $this->pack, 'Studio pack', [$this->asset], $this->rights, 0, 'save'));
+        $this->task = (string) Str::uuid();
+        $this->requestUrl = $this->base.'/packs/'.$this->pack.'/archive-export-tasks/'.$this->task;
+        $this->taskUrl = $this->base.'/archive-export-tasks/'.$this->task;
+        $this->exportArchive = fn (int $version = 1) => $this->withHeader('Idempotency-Key', $this->task)->putJson($this->requestUrl, ['version' => $version]);
+        $this->processArchive = fn () => app(ArchiveExports::class)->process($this->task);
+        $this->signArchive = fn (string $actor = '7', ?string $checksum = null) => URL::temporarySignedRoute('music.media.api.archive-download', now()->addMinute(),
+            ['workspace' => 'studio', 'task' => $this->task, 'actor' => $actor, 'sha256' => $checksum ?? str_repeat('a', 64)]);
+    });
+
+    it('queues polls and downloads a checksum-verified version-pinned ZIP through private URLs', function () {
+        ($this->exportArchive)()->assertAccepted()->assertHeader('Location', $this->taskUrl)->assertJsonPath('data.kind', 'export_pack_archive');
+        $this->getJson($this->taskUrl)->assertSuccessful()->assertJsonPath('data.status', 'queued');
+        $this->getJson($this->taskUrl.'/result')->assertAccepted()->assertHeader('Retry-After', '2');
+        $this->getJson($this->taskUrl.'/download-url')->assertConflict();
+        $this->get(($this->signArchive)())->assertConflict();
+        app(MediaPacks::class)->save($this->actor,
+            new SaveMediaPack('studio', $this->pack, 'Updated pack', [$this->asset], $this->rights, 1, 'save2'));
+        ($this->exportArchive)(2)->assertConflict();
+        ($this->processArchive)();
+        $receipt = $this->getJson($this->taskUrl.'/result')->assertSuccessful()->assertJsonPath('data.version', 1)->assertJsonPath('data.media_objects', 1);
+        $grant = $this->getJson($receipt->json('links.download_url'))->assertSuccessful()->assertHeader('Cache-Control', 'no-store, private');
+        $response = $this->get($grant->json('data.url'))->assertSuccessful()->assertHeader('Content-Type', 'application/zip')
+            ->assertHeader('ETag', '"'.$receipt->json('data.sha256').'"')->assertHeader('Accept-Ranges', 'none')->assertHeader('X-Content-Type-Options', 'nosniff');
+        $bytes = $response->streamedContent();
+        expect(strlen($bytes))->toBe($receipt->json('data.bytes'))->and(hash('sha256', $bytes))->toBe($receipt->json('data.sha256'));
+        expect($response->headers->get('Content-Disposition'))->toContain($this->task.'.zip');
+        expect(json_encode($grant->json()))->not->toContain('archive-exports/', 'object_key', 'fingerprint');
+        ($this->exportArchive)()->assertSuccessful()->assertJsonPath('data.status', 'ready');
+        $this->deleteJson($this->taskUrl)->assertConflict();
+    });
+
+    it('cancels queued work and exposes safe failed outcomes with same-command retry', function () {
+        ($this->exportArchive)()->assertAccepted();
+        $this->deleteJson($this->taskUrl)->assertSuccessful()->assertJsonPath('data.status', 'cancelled');
+        $this->deleteJson($this->taskUrl)->assertSuccessful();
+        ($this->processArchive)();
+        ($this->exportArchive)()->assertSuccessful()->assertJsonPath('data.status', 'cancelled');
+        $this->getJson($this->taskUrl.'/result')->assertConflict();
+        $this->task = (string) Str::uuid();
+        $this->taskUrl = $this->base.'/archive-export-tasks/'.$this->task;
+        $this->requestUrl = $this->base.'/packs/'.$this->pack.'/archive-export-tasks/'.$this->task;
+        ($this->exportArchive)()->assertAccepted();
+        $this->transferAllowed = false;
+        expect(fn () => ($this->processArchive)())->toThrow(AuthorizationException::class);
+        app(ArchiveExports::class)->failed($this->task);
+        $this->transferAllowed = true;
+        $this->getJson($this->taskUrl)->assertSuccessful()->assertJsonPath('data.error_code', 'archive_export_failed');
+        $this->getJson($this->taskUrl.'/result')->assertConflict();
+        ($this->exportArchive)()->assertAccepted();
+        ($this->processArchive)();
+        $this->getJson($this->taskUrl.'/result')->assertSuccessful();
+    });
+
+    it('requires every token ability and current distribution foundation and asset policies', function () {
+        ($this->exportArchive)()->assertAccepted();
+        ($this->processArchive)();
+        $url = $this->getJson($this->taskUrl.'/download-url')->assertSuccessful()->json('data.url');
+        foreach (['music.media.read', 'music.media.packs.export', 'music.media.archives.export'] as $missing) {
+            Sanctum::actingAs($this->actor, array_values(array_diff($this->scopes, [$missing])));
+            $this->getJson($this->taskUrl)->assertForbidden();
+            $this->getJson($this->taskUrl.'/result')->assertForbidden();
+            $this->getJson($this->taskUrl.'/download-url')->assertForbidden();
+            $this->get($url)->assertForbidden();
+            $this->deleteJson($this->taskUrl)->assertForbidden();
+            ($this->exportArchive)()->assertForbidden();
+        }
+        Sanctum::actingAs((new Actor())->forceFill(['id' => 8]), $this->scopes);
+        $this->getJson($this->taskUrl)->assertNotFound();
+        $this->get($url)->assertForbidden();
+        Sanctum::actingAs($this->actor, $this->scopes);
+        $this->getJson(str_replace('/studio/', '/other/', $this->taskUrl))->assertNotFound();
+        $this->transferAllowed = false;
+        $this->getJson($this->taskUrl)->assertForbidden();
+        $this->getJson($this->taskUrl.'/result')->assertForbidden();
+        $this->getJson($this->taskUrl.'/download-url')->assertForbidden();
+        $this->get($url)->assertForbidden();
+        $this->deleteJson($this->taskUrl)->assertForbidden();
+        ($this->exportArchive)()->assertForbidden();
+        $this->transferAllowed = true;
+        foreach (['pack_distribute', 'distribute', 'read'] as $denied) {
+            $this->denied = $denied;
+            $this->get($url)->assertForbidden();
+        }
+    });
+
+    it('rejects tampered actor-mismatched checksum-mismatched expired and ranged download requests', function () {
+        ($this->exportArchive)()->assertAccepted();
+        ($this->processArchive)();
+        $grant = $this->getJson($this->taskUrl.'/download-url')->assertSuccessful();
+        $url = $grant->json('data.url');
+        $this->get($url.'&extra=1')->assertForbidden();
+        $this->get($url, ['Range' => 'bytes=0-10'])->assertStatus(416)->assertHeader('Accept-Ranges', 'none');
+        $this->get(($this->signArchive)('8', $grant->json('data.sha256')))->assertForbidden();
+        $this->get(($this->signArchive)('7', str_repeat('0', 64)))->assertForbidden();
+        $this->travel(61)->seconds();
+        $this->get($url)->assertForbidden();
+        $this->travelBack();
+        $this->travel(3590)->seconds();
+        $clamped = $this->getJson($this->taskUrl.'/download-url')->assertSuccessful();
+        $task = $this->getJson($this->taskUrl)->assertSuccessful();
+        expect(Carbon::parse($clamped->json('data.expires_at'))->timestamp)->toBe(Carbon::parse($task->json('data.expires_at'))->timestamp);
+        $this->travelBack();
+        $this->travel(3601)->seconds();
+        $this->getJson($this->taskUrl)->assertSuccessful()->assertJsonPath('data.status', 'expired');
+        $this->getJson($this->taskUrl.'/result')->assertStatus(410)->assertJsonPath('type', 'https://docs.liberusoftware.com/problems/music-media-archive-result-expired');
+        $this->getJson($this->taskUrl.'/download-url')->assertStatus(410);
+        $this->get(($this->signArchive)('7', $grant->json('data.sha256')))->assertStatus(410);
+        $this->travelBack();
+    });
+
+    it('rejects corrupt missing and invalid archive requests before serving successful binary headers', function () {
+        $this->flushHeaders()->putJson($this->requestUrl, ['version' => 1])->assertStatus(428);
+        foreach ([0, '1', 1.5, '9223372036854775808'] as $version) {
+            $this->withHeader('Idempotency-Key', $this->task)->putJson($this->requestUrl, ['version' => $version])->assertUnprocessable();
+        }
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())->putJson($this->requestUrl, ['version' => 1])->assertUnprocessable();
+        $this->withHeader('Idempotency-Key', $this->task)->putJson($this->requestUrl, ['version' => 1, 'oversized' => str_repeat('x', 8193)])->assertStatus(413);
+        ($this->exportArchive)()->assertAccepted();
+        ($this->processArchive)();
+        $url = $this->getJson($this->taskUrl.'/download-url')->assertSuccessful()->json('data.url');
+        $key = $this->disk->files('music/archive-exports/'.hash('sha256', 'studio'))[0];
+        $this->disk->put($key, 'corrupt');
+        $this->get($url)->assertUnprocessable()->assertHeader('Content-Type', 'application/problem+json');
+        $this->disk->delete($key);
+        $this->get($url)->assertUnprocessable();
+    });
+
+    it('recovers a queued HTTP command after an after-commit dispatch outage', function () {
+        $bus = app(Dispatcher::class);
+        app()->instance(Dispatcher::class, Mockery::mock(Dispatcher::class)->shouldReceive('dispatch')->andThrow(new RuntimeException('/private queue secret'))->getMock());
+        $failure = ($this->exportArchive)()->assertStatus(500);
+        expect(json_encode($failure->json()))->not->toContain('/private', 'queue secret');
+        app()->instance(Dispatcher::class, $bus);
+        $this->getJson($this->taskUrl)->assertSuccessful()->assertJsonPath('data.status', 'queued');
+        ($this->exportArchive)()->assertAccepted();
+        ($this->processArchive)();
+        $this->getJson($this->taskUrl.'/result')->assertSuccessful();
     });
 });

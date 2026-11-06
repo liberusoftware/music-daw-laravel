@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add owned queued ZIP export controls, receipt polling and private actor/checksum-bound downloads with token and live rights checks.
+- Report artifact expiry as 410 and cap signed URL lifetime at the remaining artifact lifetime.
+
 - Add durable owned queued trash recovery with live worker policies, safe failure/retry outcomes and serialized cancellation/publication.
 - Add paginated authorized trash browsing and replay-safe protected batch trash HTTP commands.
 

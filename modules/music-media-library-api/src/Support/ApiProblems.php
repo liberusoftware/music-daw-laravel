@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use JsonException;
+use Liberu\Music\MediaLibrary\Exceptions\ArchiveResultExpired;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
 use Liberu\Music\MediaLibrary\Exceptions\MetadataCommandConflict;
 use Liberu\Music\MediaLibrary\Exceptions\MetadataConflict;
@@ -32,6 +33,7 @@ final class ApiProblems
         $status = match (true) {
             $exception instanceof AuthenticationException => 401, $exception instanceof AuthorizationException => 403,
             $exception instanceof OfflinePinVersionConflict => 412,
+            $exception instanceof ArchiveResultExpired => 410,
             $exception instanceof RecordNotFoundException => 404, $exception instanceof UploadConflict, $exception instanceof MetadataCommandConflict => 409,
             $exception instanceof MetadataConflict => 412, $exception instanceof UploadBudgetExceeded => 429,
             $exception instanceof ValidationException, $exception instanceof InvalidAudio => 422,
@@ -56,6 +58,7 @@ final class ApiProblems
 
         return response()->json(['type' => 'https://docs.liberusoftware.com/problems/music-media-'.match (true) {
             $exception instanceof MetadataCommandConflict => 'metadata-command-conflict',
+            $exception instanceof ArchiveResultExpired => 'archive-result-expired',
             $exception instanceof UploadBudgetExceeded => 'upload-budget-exceeded',
             default => $status,
         },

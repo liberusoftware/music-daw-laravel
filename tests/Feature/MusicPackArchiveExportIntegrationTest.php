@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Foundation\ImportExport\Contracts\TransferAuthorizer;
-use Liberu\Music\MediaLibrary\Commands\RequestArchiveExport;
 use Liberu\Music\MediaLibrary\Commands\SaveMediaPack;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Exceptions\ArchiveResultExpired;
@@ -15,9 +14,12 @@ use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Services\ArchiveExports;
 use Liberu\Music\MediaLibrary\Services\MediaPacks;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
+use Liberu\Music\MediaLibraryApi\MusicMediaLibraryApiServiceProvider;
 
 it('exports a reviewed pack on a canonical host worker and expires only its private artifact', function () {
     $this->app->register(MusicMediaLibraryServiceProvider::class);
+    $this->app->register(MusicMediaLibraryApiServiceProvider::class);
+    app('router')->getRoutes()->refreshNameLookups();
     $this->artisan('migrate', ['--path' => base_path('modules/music-media-library/database/migrations'), '--realpath' => true])->assertSuccessful();
     config()->set('music-media.disk', 'host-queued-archive');
     $disk = Storage::fake('host-queued-archive');
@@ -41,21 +43,28 @@ it('exports a reviewed pack on a canonical host worker and expires only its priv
     $pack = (string) Str::uuid();
     app(MediaPacks::class)->save($actor, new SaveMediaPack('studio', $pack, 'Studio originals', [$asset], $rights, 0, 'save'));
     $jobs = app(ArchiveExports::class);
-    $task = $jobs->request($actor, new RequestArchiveExport('studio', (string) Str::uuid(), $pack, 1));
-    expect($task->status)->toBe('queued')->and($jobs->result($actor, 'studio', $task->id))->toBeNull();
-    $jobs->process($task->id);
-    $result = $jobs->result($actor, 'studio', $task->id);
-    $stream = $jobs->open($actor, 'studio', $task->id);
-    try {
-        expect(hash('sha256', stream_get_contents($stream)))->toBe($result->sha256)->and($result->mediaObjects)->toBe(1);
-    } finally {
-        fclose($stream);
-    }
-    expect($jobs->get($actor, 'studio', $task->id)->status)->toBe('ready');
+    $token = $actor->createToken('archive-export', ['music.media.read', 'music.media.packs.export', 'music.media.archives.export'])->plainTextToken;
+    $this->withToken($token);
+    $taskId = (string) Str::uuid();
+    $base = '/api/v1/music-media/workspaces/studio';
+    $taskUrl = $base.'/archive-export-tasks/'.$taskId;
+    $this->withHeader('Idempotency-Key', $taskId)->putJson($base.'/packs/'.$pack.'/archive-export-tasks/'.$taskId, ['version' => 1])->assertAccepted();
+    $this->getJson($taskUrl)->assertSuccessful()->assertJsonPath('data.status', 'queued');
+    $this->getJson($taskUrl.'/result')->assertAccepted();
+    $jobs->process($taskId);
+    $receipt = $this->getJson($taskUrl.'/result')->assertSuccessful()->assertJsonPath('data.media_objects', 1);
+    $grant = $this->getJson($receipt->json('links.download_url'))->assertSuccessful();
+    $response = $this->get($grant->json('data.url'))->assertSuccessful()->assertHeader('Content-Type', 'application/zip');
+    expect(hash('sha256', $response->streamedContent()))->toBe($receipt->json('data.sha256'));
+    $this->getJson($taskUrl)->assertSuccessful()->assertJsonPath('data.status', 'ready');
     $this->travel(3601)->seconds();
-    expect(fn () => $jobs->open($actor, 'studio', $task->id))->toThrow(ArchiveResultExpired::class);
-    expect($jobs->cleanup($actor, 'studio'))->toBe(1)->and($jobs->get($actor, 'studio', $task->id)->status)->toBe('expired')
+    expect(fn () => $jobs->open($actor, 'studio', $taskId))->toThrow(ArchiveResultExpired::class);
+    expect($jobs->cleanup($actor, 'studio'))->toBe(1)->and($jobs->get($actor, 'studio', $taskId)->status)->toBe('expired')
         ->and($uploads->get($actor, 'studio', $asset)->id)->toBe($asset)
         ->and($disk->files('music/archive-exports/'.hash('sha256', 'studio')))->toBe([]);
     $this->travelBack();
+    $actor->tokens()->delete();
+    app('auth')->forgetGuards();
+    $this->getJson($taskUrl)->assertUnauthorized();
+    $this->get($grant->json('data.url'))->assertUnauthorized();
 });
