@@ -2,5 +2,7 @@
 
 ## 0.1.0
 
-- Preserve the initial experimental graph metadata and project snapshot implementation as work in progress.
-- Native runtime, playback, rendering, dedicated tests, and acceptance verification remain pending.
+- Add initial experimental graph metadata and project-pinned handoff snapshots.
+- Verify graph validation, declared compensation plans, media resolution, wire precision, authorization, revisions, replay and transaction rollback with 100% module source coverage.
+- Verify real host WAVE intake, retention and transactional audit composition.
+- Native runtime, playback, transport, rendering, migration and hardware acceptance remain pending.

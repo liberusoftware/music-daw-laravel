@@ -46,6 +46,26 @@ jobs:
         with:
           name: module-manager-coverage
           path: modules/module-manager/coverage/module-manager.xml
+  music-audio-engine:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/music-audio-engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: intl, mbstring, pdo_sqlite
+          coverage: pcov
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: vendor/bin/phpstan analyse src --level=5 --no-progress --memory-limit=512M
+      - run: composer test:coverage -- --coverage-clover=coverage/audio-engine.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audio-engine-coverage
+          path: modules/music-audio-engine/coverage/audio-engine.xml
   music-projects:
     runs-on: ubuntu-latest
     defaults:
