@@ -6,9 +6,13 @@ use App\Support\AuditedSessionRevisions;
 use App\Support\MusicWorkspaceContext;
 use App\Support\UploadedSessionMedia;
 use App\Support\UploadedSessionRetention;
+use App\Support\WorkspaceMediaAuthorizer;
+use App\Support\WorkspacePackDistribution;
 use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Support\ServiceProvider;
 use Liberu\Foundation\Files\Contracts\MediaAccess;
+use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
+use Liberu\Music\MediaLibrary\Contracts\PackDistributionPolicy;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Support\ScopedMediaAccess;
 use Liberu\Music\Projects\Contracts\SessionAudit;
@@ -28,6 +32,11 @@ final class MusicModuleIntegrationProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if ($this->app->getProvider(MusicMediaLibraryServiceProvider::class) !== null) {
+            $this->app->bind(MediaAuthorizer::class, WorkspaceMediaAuthorizer::class);
+            $this->app->bind(PackDistributionPolicy::class, WorkspacePackDistribution::class);
+        }
+
         if ($this->app->getProvider(MusicProjectsServiceProvider::class) === null
             || $this->app->getProvider(MusicMediaLibraryServiceProvider::class) === null) {
             return;

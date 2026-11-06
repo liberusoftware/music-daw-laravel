@@ -9,8 +9,10 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
+use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
+use Liberu\Music\MediaLibrary\Support\GateMediaAuthorizer;
 use Liberu\Music\Projects\Commands\SaveSession;
 use Liberu\Music\Projects\Data\SessionDocument;
 use Liberu\Music\Projects\Services\ProjectSessions;
@@ -27,6 +29,9 @@ it('composes the Livewire session journey with actual verified and retained audi
     $this->app->register(MusicProjectsLivewireServiceProvider::class);
     $this->app->register(MusicMediaLibraryServiceProvider::class);
     (new MusicModuleIntegrationProvider($this->app))->boot();
+    // This contract fixture supplies synthetic workspace policies. Real host
+    // membership/permission enforcement is covered by MusicMediaWorkspaceAuthorizationTest.
+    app()->bind(MediaAuthorizer::class, GateMediaAuthorizer::class);
     $this->artisan('migrate', ['--path' => base_path('modules/music-media-library/database/migrations'), '--realpath' => true])->assertSuccessful();
     config()->set('music-media.disk', 'host-livewire-sessions');
     Storage::fake('host-livewire-sessions');

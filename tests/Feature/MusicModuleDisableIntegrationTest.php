@@ -39,8 +39,14 @@ CODE;
         $migration->setTimeout(60)->mustRun();
         $saved = $run(<<<'CODE'
 $actor = App\Models\User::factory()->create();
-foreach (['music.projects.write', 'music.projects.read', 'music.media.upload', 'music.media.read', 'music.media.retain'] as $ability) {
-    Illuminate\Support\Facades\Gate::define($ability, fn ($user, $workspace) => $user->is($actor) && $workspace === 'lifecycle-workspace');
+$team = Liberu\Foundation\Organizations\Models\Team::factory()->create(['user_id' => $actor->id]);
+$workspace = (string) $team->id;
+setPermissionsTeamId($team->id);
+foreach (['upload', 'read', 'retain'] as $operation) {
+    $actor->givePermissionTo(Spatie\Permission\Models\Permission::findOrCreate('music.media.'.$operation, 'web'));
+}
+foreach (['music.projects.write', 'music.projects.read'] as $ability) {
+    Illuminate\Support\Facades\Gate::define($ability, fn ($user, $requested) => $user->is($actor) && $requested === $workspace);
 }
 $app->instance(Liberu\Foundation\Files\Contracts\MalwareScanner::class, new class implements Liberu\Foundation\Files\Contracts\MalwareScanner {
     public function clean(string $path): bool { return true; }
@@ -49,15 +55,15 @@ $chunks = 'fmt '.pack('V', 16).pack('vvVVvv', 1, 1, 48000, 96000, 2, 16).'data'.
 $bytes = 'RIFF'.pack('V', strlen($chunks) + 4).'WAVE'.$chunks;
 $assetId = (string) Illuminate\Support\Str::uuid();
 $uploads = app(Liberu\Music\MediaLibrary\Services\MediaUploads::class);
-$uploads->start($actor, new Liberu\Music\MediaLibrary\Commands\StartUpload('lifecycle-workspace', $assetId, 'Durable take', strlen($bytes), hash('sha256', $bytes)));
-$uploads->append($actor, 'lifecycle-workspace', $assetId, 0, $bytes);
-$asset = $uploads->complete($actor, 'lifecycle-workspace', $assetId);
+$uploads->start($actor, new Liberu\Music\MediaLibrary\Commands\StartUpload($workspace, $assetId, 'Durable take', strlen($bytes), hash('sha256', $bytes)));
+$uploads->append($actor, $workspace, $assetId, 0, $bytes);
+$asset = $uploads->complete($actor, $workspace, $assetId);
 $document = Liberu\Music\Projects\Data\SessionDocument::empty()->jsonSerialize();
 $document['assets'] = [$asset->reference()];
 $document['tracks'] = [['id' => (string) Illuminate\Support\Str::uuid(), 'name' => 'Take', 'kind' => 'audio', 'parent_id' => null, 'media_ids' => [$assetId]]];
 $id = (string) Illuminate\Support\Str::uuid();
-$revision = app(Liberu\Music\Projects\Services\ProjectSessions::class)->save($actor, new Liberu\Music\Projects\Commands\SaveSession('lifecycle-workspace', $id, 'Keep this session', Liberu\Music\Projects\Data\SessionDocument::fromArray($document), 0, 'initial'));
-echo json_encode(['actor_id' => $actor->id, 'project_id' => $id, 'asset_id' => $assetId, 'checksum' => $revision->document->checksum(), 'asset' => $asset->reference(), 'route' => Illuminate\Support\Facades\Route::has('music.projects.livewire.workspace')], JSON_THROW_ON_ERROR);
+$revision = app(Liberu\Music\Projects\Services\ProjectSessions::class)->save($actor, new Liberu\Music\Projects\Commands\SaveSession($workspace, $id, 'Keep this session', Liberu\Music\Projects\Data\SessionDocument::fromArray($document), 0, 'initial'));
+echo json_encode(['actor_id' => $actor->id, 'workspace_id' => $workspace, 'project_id' => $id, 'asset_id' => $assetId, 'checksum' => $revision->document->checksum(), 'asset' => $asset->reference(), 'route' => Illuminate\Support\Facades\Route::has('music.projects.livewire.workspace')], JSON_THROW_ON_ERROR);
 CODE);
         expect($saved['route'])->toBeTrue();
         $pdo = new PDO('sqlite:'.$database);
@@ -91,13 +97,14 @@ CODE, $disabled);
             ->and($snapshot())->toBe($before);
         $reopened = $run(<<<'CODE'
 $actor = App\Models\User::findOrFail((int) getenv('MUSIC_ACTOR_ID'));
-foreach (['music.projects.read', 'music.media.read'] as $ability) {
-    Illuminate\Support\Facades\Gate::define($ability, fn ($user, $workspace) => $user->is($actor) && $workspace === 'lifecycle-workspace');
+$workspace = getenv('MUSIC_WORKSPACE_ID');
+foreach (['music.projects.read'] as $ability) {
+    Illuminate\Support\Facades\Gate::define($ability, fn ($user, $requested) => $user->is($actor) && $requested === $workspace);
 }
-$revision = app(Liberu\Music\Projects\Services\ProjectSessions::class)->get($actor, 'lifecycle-workspace', getenv('MUSIC_PROJECT_ID'));
-echo json_encode(['version' => $revision->version, 'title' => $revision->title, 'checksum' => $revision->document->checksum(), 'assets' => $revision->document->assets(), 'route' => Illuminate\Support\Facades\Route::has('music.projects.livewire.workspace')], JSON_THROW_ON_ERROR);
-CODE, ['MUSIC_ACTOR_ID' => (string) $saved['actor_id'], 'MUSIC_PROJECT_ID' => $saved['project_id']]);
-        expect($reopened)->toBe(['version' => 1, 'title' => 'Keep this session', 'checksum' => $saved['checksum'], 'assets' => [$saved['asset']], 'route' => true])
+$revision = app(Liberu\Music\Projects\Services\ProjectSessions::class)->get($actor, $workspace, getenv('MUSIC_PROJECT_ID'));
+echo json_encode(['version' => $revision->version, 'title' => $revision->title, 'checksum' => $revision->document->checksum(), 'assets' => $revision->document->assets(), 'wrong_workspace_denied' => Illuminate\Support\Facades\Gate::forUser($actor)->denies('music.projects.read', ['other-workspace', '*']), 'route' => Illuminate\Support\Facades\Route::has('music.projects.livewire.workspace')], JSON_THROW_ON_ERROR);
+CODE, ['MUSIC_ACTOR_ID' => (string) $saved['actor_id'], 'MUSIC_WORKSPACE_ID' => $saved['workspace_id'], 'MUSIC_PROJECT_ID' => $saved['project_id']]);
+        expect($reopened)->toBe(['version' => 1, 'title' => 'Keep this session', 'checksum' => $saved['checksum'], 'assets' => [$saved['asset']], 'wrong_workspace_denied' => true, 'route' => true])
             ->and($snapshot())->toBe($before);
     } finally {
         $files->deleteDirectory($directory);

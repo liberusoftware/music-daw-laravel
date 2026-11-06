@@ -9,9 +9,11 @@ use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
+use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Services\MediaRetention;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
+use Liberu\Music\MediaLibrary\Support\GateMediaAuthorizer;
 use Liberu\Music\MediaLibrary\Support\ScopedMediaAccess;
 use Liberu\Music\Projects\Data\SessionDocument;
 use Liberu\Music\ProjectsApi\MusicProjectsApiServiceProvider;
@@ -19,6 +21,9 @@ use Liberu\Music\ProjectsApi\MusicProjectsApiServiceProvider;
 it('saves recovers and imports API sessions with actual verified media and transactional retention', function () {
     $this->app->register(MusicMediaLibraryServiceProvider::class);
     (new MusicModuleIntegrationProvider($this->app))->boot();
+    // This contract fixture supplies synthetic workspace policies. Real host
+    // membership/permission enforcement is covered by MusicMediaWorkspaceAuthorizationTest.
+    app()->bind(MediaAuthorizer::class, GateMediaAuthorizer::class);
     $this->app->register(MusicProjectsApiServiceProvider::class);
     app('router')->getRoutes()->refreshNameLookups();
     $this->artisan('migrate', ['--path' => base_path('modules/music-media-library/database/migrations'), '--realpath' => true])->assertSuccessful();
@@ -71,5 +76,8 @@ it('keeps the media bridge unavailable when the host has no configured identity 
     config()->set('auth.guards.'.config('auth.defaults.guard').'.provider', null);
     $this->app->register(MusicMediaLibraryServiceProvider::class);
     (new MusicModuleIntegrationProvider($this->app))->boot();
+    // This contract fixture supplies synthetic workspace policies. Real host
+    // membership/permission enforcement is covered by MusicMediaWorkspaceAuthorizationTest.
+    app()->bind(MediaAuthorizer::class, GateMediaAuthorizer::class);
     expect(app(ScopedMediaAccess::class)->authorized(1, (string) Str::uuid(), 'read'))->toBeFalse();
 });

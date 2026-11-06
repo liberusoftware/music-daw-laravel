@@ -17,6 +17,7 @@ use Liberu\Music\MediaLibrary\Commands\CollectCancelledUploads;
 use Liberu\Music\MediaLibrary\Commands\RestoreAsset;
 use Liberu\Music\MediaLibrary\Commands\SaveOfflinePin;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
+use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Services\MediaRetention;
@@ -24,6 +25,7 @@ use Liberu\Music\MediaLibrary\Services\MediaUploads;
 use Liberu\Music\MediaLibrary\Services\OfflinePins;
 use Liberu\Music\MediaLibrary\Services\QuarantineCleanup;
 use Liberu\Music\MediaLibrary\Services\UploadBudgets;
+use Liberu\Music\MediaLibrary\Support\GateMediaAuthorizer;
 use Liberu\Music\Projects\Commands\BackfillSessionRetention;
 use Liberu\Music\Projects\Commands\SaveSession;
 use Liberu\Music\Projects\Contracts\VerifiedMedia;
@@ -40,6 +42,9 @@ it('saves, recovers and reopens portable sessions using actual verified uploaded
     $this->assertGuest();
     $this->app->register(MusicMediaLibraryServiceProvider::class);
     (new MusicModuleIntegrationProvider($this->app))->boot();
+    // This contract fixture supplies synthetic workspace policies. Real host
+    // membership/permission enforcement is covered by MusicMediaWorkspaceAuthorizationTest.
+    app()->bind(MediaAuthorizer::class, GateMediaAuthorizer::class);
     $this->artisan('migrate', ['--path' => base_path('modules/music-media-library/database/migrations'), '--realpath' => true])->assertSuccessful();
     config()->set('music-media.disk', 'music-session-integration');
     $disk = Storage::fake('music-session-integration');
@@ -140,6 +145,9 @@ it('saves, recovers and reopens portable sessions using actual verified uploaded
 it('reopens a saved session after authorized restoration without rewriting its revision', function () {
     $this->app->register(MusicMediaLibraryServiceProvider::class);
     (new MusicModuleIntegrationProvider($this->app))->boot();
+    // This contract fixture supplies synthetic workspace policies. Real host
+    // membership/permission enforcement is covered by MusicMediaWorkspaceAuthorizationTest.
+    app()->bind(MediaAuthorizer::class, GateMediaAuthorizer::class);
     $this->artisan('migrate', ['--path' => base_path('modules/music-media-library/database/migrations'), '--realpath' => true])->assertSuccessful();
     config()->set('music-media.disk', 'session-restore-test');
     $disk = Storage::fake('session-restore-test');
