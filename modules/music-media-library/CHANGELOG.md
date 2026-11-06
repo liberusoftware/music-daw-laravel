@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add purpose-bound resumable archive intake using the existing quarantine and reservation ledger, with owned scanner/checksum-verified snapshots.
+- Preserve legacy audio fingerprints and limits, reject archive-to-audio publication, and guard rollback of active archive purpose metadata.
+
 - Document the optional archive export HTTP consumer and distinguish remaining queued import scope.
 
 - Add durable canonical-requester pack ZIP export tasks, private checksum-verified results, expiry and bounded operator cleanup.

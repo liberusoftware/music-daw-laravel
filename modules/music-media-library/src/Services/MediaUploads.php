@@ -23,6 +23,7 @@ use Liberu\Music\MediaLibrary\Events\AssetRestored;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
 use Liberu\Music\MediaLibrary\Exceptions\UploadConflict;
 use RuntimeException;
+use Throwable;
 
 final readonly class MediaUploads
 {
@@ -45,7 +46,7 @@ final readonly class MediaUploads
         return $this->database->transaction(function () use ($actor, $command, $fingerprint): UploadProgress {
             $inserted = $this->database->table('music_media_uploads')->insertOrIgnore([
                 'id' => $command->uploadId, 'workspace_id' => $command->workspaceId,
-                'actor_id' => (string) $actor->getAuthIdentifier(), 'name' => $command->name,
+                'actor_id' => (string) $actor->getAuthIdentifier(), 'name' => $command->name, 'purpose' => $command->purpose,
                 'search_name' => Str::lower($command->name),
                 'total_bytes' => $command->bytes, 'received_bytes' => 0, 'sha256' => $command->sha256,
                 'fingerprint' => $fingerprint, 'status' => 'uploading',
@@ -134,7 +135,7 @@ final readonly class MediaUploads
                 return $this->progress($upload);
             }
             if ($upload->status !== 'uploading' || (int) $upload->received_bytes !== $offsetBytes
-                || $offsetBytes + strlen($bytes) > (int) $upload->total_bytes || $chunks->count() >= 4096) {
+                || $offsetBytes + strlen($bytes) > (int) $upload->total_bytes || $chunks->count() >= ($upload->purpose === 'archive' ? 8192 : 4096)) {
                 throw new UploadConflict('The chunk does not match the next upload position or upload limits.');
             }
             $key = 'music/quarantine/'.$uploadId.'/'.$offsetBytes.'-'.$checksum;
@@ -169,6 +170,9 @@ final readonly class MediaUploads
 
         return $this->database->transaction(function () use ($actor, $workspaceId, $uploadId, $restore): ReadyAsset {
             $upload = $this->upload($workspaceId, $uploadId)->lockForUpdate()->firstOrFail();
+            if ($upload->purpose !== 'audio') {
+                throw new UploadConflict('Archive inputs cannot be published as audio.');
+            }
             $this->contentLocks->acquire($workspaceId, $upload->sha256, $this->database);
             $target = null;
             $fingerprint = null;
@@ -197,30 +201,8 @@ final readonly class MediaUploads
             if (! in_array($upload->status, ['uploading', 'ready'], true) || (int) $upload->received_bytes !== (int) $upload->total_bytes) {
                 throw new UploadConflict('All upload bytes must be received before verification.');
             }
-            $stream = tmpfile() ?: throw new RuntimeException('Temporary audio storage is unavailable.');
+            $stream = $this->assemble($upload);
             try {
-                $chunks = $this->database->table('music_media_upload_chunks')->where('upload_id', $uploadId)->orderBy('offset_bytes')->cursor();
-                $position = 0;
-                foreach ($chunks as $chunk) {
-                    if ((int) $chunk->offset_bytes !== $position) {
-                        throw new InvalidAudio('The upload contains a gap.');
-                    }
-                    $source = $this->readObject($chunk->object_key);
-                    try {
-                        if (stream_copy_to_stream($source, $stream, (int) $chunk->bytes + 1) !== (int) $chunk->bytes) {
-                            throw new InvalidAudio('An upload chunk is incomplete.');
-                        }
-                    } finally {
-                        fclose($source);
-                    }
-                    $position += (int) $chunk->bytes;
-                }
-                if ($position !== (int) $upload->total_bytes) {
-                    throw new InvalidAudio('The assembled upload is incomplete.');
-                }
-                if ($this->scanner === null || ! $this->scanner->clean(stream_get_meta_data($stream)['uri'])) {
-                    throw new InvalidAudio('Audio remains quarantined until the configured malware scanner accepts it.');
-                }
                 $audio = $this->inspector->inspect($stream);
                 if ($audio->bytes !== (int) $upload->total_bytes || ! hash_equals($upload->sha256, $audio->sha256)) {
                     throw new InvalidAudio('The verified upload checksum or size differs from its declaration.');
@@ -288,6 +270,67 @@ final readonly class MediaUploads
 
             return $this->progress($upload);
         }, 3);
+    }
+
+    /** @return resource A scanner-approved, checksum-verified private input; caller must close it. */
+    public function openArchive(Authenticatable $actor, string $workspaceId, string $uploadId): mixed
+    {
+        $this->access->authorize($actor, $workspaceId, $uploadId, 'upload');
+        $upload = $this->upload($workspaceId, $uploadId)->where('actor_id', (string) $actor->getAuthIdentifier())->where('purpose', 'archive')->firstOrFail();
+        if ($upload->status !== 'uploading' || (int) $upload->received_bytes !== (int) $upload->total_bytes) {
+            throw new UploadConflict('Only complete active archive inputs can be opened.');
+        }
+        $stream = $this->assemble($upload);
+        try {
+            $hash = hash_init('sha256');
+            $length = hash_update_stream($hash, $stream, (int) $upload->total_bytes + 1);
+            if ($length !== (int) $upload->total_bytes || ! hash_equals($upload->sha256, hash_final($hash))) {
+                throw new InvalidAudio('The archive input checksum differs from its declaration.');
+            }
+            rewind($stream);
+
+            return $stream;
+        } catch (Throwable $exception) {
+            fclose($stream);
+            throw $exception;
+        }
+    }
+
+    /** @return resource */
+    private function assemble(object $upload): mixed
+    {
+        $stream = tmpfile() ?: throw new RuntimeException('Temporary media storage is unavailable.');
+        try {
+            $chunks = $this->database->table('music_media_upload_chunks')->where('upload_id', $upload->id)->orderBy('offset_bytes')->cursor();
+            $position = 0;
+            foreach ($chunks as $chunk) {
+                if ((int) $chunk->offset_bytes !== $position) {
+                    throw new InvalidAudio('The upload contains a gap.');
+                }
+                $source = $this->readObject($chunk->object_key);
+                try {
+                    if (stream_copy_to_stream($source, $stream, (int) $chunk->bytes + 1) !== (int) $chunk->bytes) {
+                        throw new InvalidAudio('An upload chunk is incomplete.');
+                    }
+                } finally {
+                    fclose($source);
+                }
+                $position += (int) $chunk->bytes;
+            }
+            if ($position !== (int) $upload->total_bytes) {
+                throw new InvalidAudio('The assembled upload is incomplete.');
+            }
+            fflush($stream) ?: throw new RuntimeException('Private media staging could not be flushed.');
+            if ($this->scanner === null || ! $this->scanner->clean(stream_get_meta_data($stream)['uri'])) {
+                throw new InvalidAudio('Media remains quarantined until the configured malware scanner accepts it.');
+            }
+            rewind($stream);
+
+            return $stream;
+        } catch (Throwable $exception) {
+            fclose($stream);
+            throw $exception;
+        }
     }
 
     private function upload(string $workspaceId, string $uploadId): Builder

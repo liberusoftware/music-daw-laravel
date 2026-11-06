@@ -15,16 +15,19 @@ use Illuminate\Validation\ValidationException;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Foundation\Files\Contracts\MediaAccess;
 use Liberu\Foundation\ImportExport\Contracts\TransferAuthorizer;
+use Liberu\Music\MediaLibrary\Commands\CollectCancelledUploads;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\Events\AssetReady;
 use Liberu\Music\MediaLibrary\Exceptions\InvalidAudio;
+use Liberu\Music\MediaLibrary\Exceptions\UploadBudgetExceeded;
 use Liberu\Music\MediaLibrary\Exceptions\UploadConflict;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Services\AssetWaveforms;
 use Liberu\Music\MediaLibrary\Services\ContentLocks;
 use Liberu\Music\MediaLibrary\Services\MediaDownloads;
 use Liberu\Music\MediaLibrary\Services\MediaUploads;
+use Liberu\Music\MediaLibrary\Services\QuarantineCleanup;
 use Liberu\Music\MediaLibrary\Services\UploadBudgets;
 use Liberu\Music\MediaLibrary\Services\WaveformIndexer;
 use Liberu\Music\MediaLibrary\Services\WaveInspector;
@@ -424,4 +427,146 @@ it('rejects unverified unavailable cross-workspace and corrupted downloadable me
     expect(fn () => $downloads->open($this->actor, 'studio', $this->id))->toThrow(InvalidAudio::class);
     DB::table('music_media_uploads')->where('id', $this->id)->update(['status' => 'trashed']);
     expect(fn () => $downloads->open($this->actor, 'studio', $this->id))->toThrow(RecordNotFoundException::class);
+});
+
+describe('private resumable archive inputs', function () {
+    beforeEach(function () {
+        $file = tmpfile();
+        $path = stream_get_meta_data($file)['uri'];
+        $zip = new ZipArchive();
+        $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        $zip->addFromString('manifest.json', '{"format":"untrusted"}');
+        $zip->close();
+        $this->archiveBytes = file_get_contents($path);
+        fclose($file);
+        $this->archiveId = (string) Str::uuid();
+        $this->archiveCommand = fn (?string $checksum = null) => new StartUpload('studio', $this->archiveId, 'Import.zip', strlen($this->archiveBytes), $checksum ?? hash('sha256', $this->archiveBytes), purpose: 'archive');
+        $this->receiveArchive = function (): void {
+            $this->uploads->start($this->actor, ($this->archiveCommand)());
+            $this->uploads->append($this->actor, 'studio', $this->archiveId, 0, $this->archiveBytes);
+        };
+    });
+
+    it('resumes private chunks and opens only a scanned checksum-verified owned snapshot without publishing audio', function () {
+        $this->uploads->start($this->actor, ($this->archiveCommand)());
+        expect(fn () => $this->uploads->openArchive($this->actor, 'studio', $this->archiveId))->toThrow(UploadConflict::class);
+        $this->uploads->append($this->actor, 'studio', $this->archiveId, 0, substr($this->archiveBytes, 0, 20));
+        $resumed = app(MediaUploads::class);
+        $resumed->append($this->actor, 'studio', $this->archiveId, 20, substr($this->archiveBytes, 20));
+        $resumed->append($this->actor, 'studio', $this->archiveId, 20, substr($this->archiveBytes, 20));
+        $stream = $resumed->openArchive($this->actor, 'studio', $this->archiveId);
+        try {
+            expect(stream_get_contents($stream))->toBe($this->archiveBytes);
+            rewind($stream);
+            expect(hash('sha256', stream_get_contents($stream)))->toBe(hash('sha256', $this->archiveBytes));
+        } finally {
+            fclose($stream);
+        }
+        expect($resumed->status($this->actor, 'studio', $this->archiveId)->status)->toBe('uploading');
+        expect(fn () => $resumed->complete($this->actor, 'studio', $this->archiveId))->toThrow(UploadConflict::class, 'cannot be published as audio');
+        expect(fn () => $resumed->get($this->actor, 'studio', $this->archiveId))->toThrow(RecordNotFoundException::class);
+        expect(DB::table('music_media_uploads')->where('id', $this->archiveId)->value('blob_key'))->toBeNull();
+        $resumed->cancel($this->actor, 'studio', $this->archiveId);
+        expect(fn () => $resumed->openArchive($this->actor, 'studio', $this->archiveId))->toThrow(UploadConflict::class);
+    });
+
+    it('rejects revoked access foreign ownership wrong workspace and audio-purpose inputs', function () {
+        ($this->receiveArchive)();
+        expect(fn () => $this->uploads->openArchive($this->actor, 'other', $this->archiveId))->toThrow(RecordNotFoundException::class);
+        app(Gate::class)->define('music.media.upload', fn () => true);
+        expect(fn () => $this->uploads->openArchive(new GenericUser(['id' => 8]), 'studio', $this->archiveId))->toThrow(RecordNotFoundException::class);
+        ($this->receive)();
+        expect(fn () => $this->uploads->openArchive($this->actor, 'studio', $this->id))->toThrow(RecordNotFoundException::class);
+        app(Gate::class)->define('music.media.upload', fn () => false);
+        expect(fn () => $this->uploads->openArchive($this->actor, 'studio', $this->archiveId))->toThrow(AuthorizationException::class);
+    });
+
+    it('rejects tampered archive bytes missing chunks and scanner denial before yielding a resource', function () {
+        ($this->receiveArchive)();
+        $key = DB::table('music_media_upload_chunks')->where('upload_id', $this->archiveId)->value('object_key');
+        $this->disk->put($key, str_repeat('x', strlen($this->archiveBytes)));
+        expect(fn () => $this->uploads->openArchive($this->actor, 'studio', $this->archiveId))->toThrow(InvalidAudio::class, 'checksum');
+        $this->disk->delete($key);
+        expect(fn () => $this->uploads->openArchive($this->actor, 'studio', $this->archiveId))->toThrow(InvalidAudio::class);
+        $this->uploads->append($this->actor, 'studio', $this->archiveId, 0, $this->archiveBytes);
+        $this->scanner->shouldReceive('clean')->andReturnFalse();
+        expect(fn () => $this->uploads->openArchive($this->actor, 'studio', $this->archiveId))->toThrow(InvalidAudio::class, 'quarantined');
+        expect($this->uploads->status($this->actor, 'studio', $this->archiveId)->status)->toBe('uploading');
+    });
+
+    it('preserves legacy audio idempotency while binding archive purpose into command identity', function () {
+        $command = ($this->command)();
+        $this->uploads->start($this->actor, $command);
+        $legacy = ['workspaceId' => 'studio', 'uploadId' => $this->id, 'name' => 'Recording.wav', 'bytes' => strlen($this->bytes),
+            'sha256' => hash('sha256', $this->bytes), 'provenance' => ['license' => 'original', 'attribution' => 'Artist']];
+        DB::table('music_media_uploads')->where('id', $this->id)->update(['fingerprint' => hash('sha256', json_encode(['7', $legacy], JSON_THROW_ON_ERROR))]);
+        expect($this->uploads->start($this->actor, $command)->status)->toBe('uploading');
+        $archive = new StartUpload('studio', $this->id, $command->name, $command->bytes, $command->sha256, $command->provenance, 'archive');
+        expect(fn () => $this->uploads->start($this->actor, $archive))->toThrow(UploadConflict::class);
+    });
+
+    it('bounds archive inputs with container overhead while preserving the audio ceiling', function () {
+        $large = new StartUpload('studio', $this->archiveId, 'Large.zip', 1073741825, str_repeat('a', 64), purpose: 'archive');
+        expect($this->uploads->start($this->actor, $large)->totalBytes)->toBe(1073741825);
+        expect(fn () => new StartUpload('studio', (string) Str::uuid(), 'Audio', 1073741825, str_repeat('a', 64)))->toThrow(ValidationException::class);
+        config()->set('music-media.archive_max_audio_bytes', 17179869184);
+        expect((new StartUpload('studio', (string) Str::uuid(), 'Maximum.zip', 17196646400, str_repeat('a', 64), purpose: 'archive'))->bytes)->toBe(17196646400);
+        expect(fn () => new StartUpload('studio', (string) Str::uuid(), 'Oversized.zip', 17196646401, str_repeat('a', 64), purpose: 'archive'))->toThrow(ValidationException::class);
+        config()->set('music-media.archive_max_audio_bytes', 0);
+        expect(fn () => ($this->archiveCommand)())->toThrow(ValidationException::class);
+        expect(fn () => new StartUpload('studio', (string) Str::uuid(), 'Invalid purpose', 44, str_repeat('a', 64), purpose: 'other'))->toThrow(ValidationException::class);
+    });
+
+    it('keeps archive reservations charged until cancelled chunks are collected', function () {
+        app(Gate::class)->define('music.media.quota_read', fn () => true);
+        config()->set('music-media.max_reserved_bytes', strlen($this->archiveBytes) * 2 - 1);
+        expect(fn () => $this->uploads->start($this->actor, ($this->archiveCommand)()))->toThrow(UploadBudgetExceeded::class);
+        expect(fn () => $this->uploads->status($this->actor, 'studio', $this->archiveId))->toThrow(RecordNotFoundException::class);
+        config()->set('music-media.max_reserved_bytes', strlen($this->archiveBytes) * 2);
+        ($this->receiveArchive)();
+        expect(app(UploadBudgets::class)->get($this->actor, 'studio')->reservedBytes)->toBe(strlen($this->archiveBytes) * 2);
+        $this->uploads->cancel($this->actor, 'studio', $this->archiveId);
+        expect(app(UploadBudgets::class)->get($this->actor, 'studio')->reservedBytes)->toBe(strlen($this->archiveBytes) * 2);
+        app(Gate::class)->define('music.media.collect', fn () => true);
+        $this->travel(86401)->seconds();
+        app(QuarantineCleanup::class)->collect($this->actor,
+            new CollectCancelledUploads('studio', dryRun: false));
+        expect(app(UploadBudgets::class)->get($this->actor, 'studio')->reservedBytes)->toBe(0);
+        $this->travelBack();
+    });
+
+    it('allows the bounded archive chunk budget without lifting the audio chunk budget', function () {
+        $this->uploads->start($this->actor, ($this->archiveCommand)());
+        $rows = [];
+        for ($index = 1; $index <= 8191; $index++) {
+            $rows[] = ['upload_id' => $this->archiveId, 'offset_bytes' => 100000 + $index, 'bytes' => 1, 'sha256' => str_repeat('a', 64), 'object_key' => 'test'];
+        }
+        foreach (array_chunk($rows, 512) as $batch) {
+            DB::table('music_media_upload_chunks')->insert($batch);
+        }
+        expect($this->uploads->append($this->actor, 'studio', $this->archiveId, 0, 'P')->receivedBytes)->toBe(1);
+        expect(fn () => $this->uploads->append($this->actor, 'studio', $this->archiveId, 1, 'K'))->toThrow(UploadConflict::class);
+    });
+
+    it('refuses purpose rollback while resumable archive inputs are active', function () {
+        ($this->receiveArchive)();
+        $migration = require __DIR__.'/../../database/migrations/2026_11_06_001446_add_archive_purpose_to_music_media_uploads.php';
+        expect(fn () => $migration->down())->toThrow(LogicException::class, 'Cancel active archive inputs');
+        expect(DB::table('music_media_uploads')->where('id', $this->archiveId)->value('purpose'))->toBe('archive');
+        $this->uploads->cancel($this->actor, 'studio', $this->archiveId);
+        $migration->down();
+        expect(DB::table('music_media_uploads')->where('id', $this->archiveId)->value('status'))->toBe('cancelled');
+        $migration->up();
+    });
+
+    it('adds and rolls back only purpose metadata without deleting pre-existing audio rows', function () {
+        ($this->receive)();
+        $this->uploads->complete($this->actor, 'studio', $this->id);
+        $migration = require __DIR__.'/../../database/migrations/2026_11_06_001446_add_archive_purpose_to_music_media_uploads.php';
+        $migration->down();
+        expect(Schema::hasColumn('music_media_uploads', 'purpose'))->toBeFalse()->and(DB::table('music_media_uploads')->where('id', $this->id)->value('status'))->toBe('ready');
+        $migration->up();
+        expect(DB::table('music_media_uploads')->where('id', $this->id)->value('purpose'))->toBe('audio')
+            ->and($this->uploads->get($this->actor, 'studio', $this->id)->id)->toBe($this->id);
+    });
 });
