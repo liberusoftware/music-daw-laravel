@@ -103,7 +103,7 @@ Metadata key reuse now throws `MetadataCommandConflict`, a subclass of `Metadata
 
 `cleanup(actor, workspace, limit)` requires the dedicated `music.media.archive_cleanup` Core gate, accepts 1–100 records, and removes only expired ready artifacts and failed/cancelled staging older than one day. Missing files are acknowledged on retry; failed deletes/ledger acknowledgement fail closed. Object addresses are constructed under the private archive prefix from workspace/task hashes, not client paths. Cleanup does not delete packs, source audio or retention references. The host must schedule this public operator action; it is not auto-scheduled by module installation. Failed acknowledgement can leave private staging owned by its task; retry replaces it, or cancel/fail the task and clean it after the staging grace. Queued tasks are not pruned automatically.
 
-This increment provides Core asynchronous export orchestration. The optional HTTP adapter exposes owned export jobs and authenticated private ZIP downloads; archive intake/import HTTP routes remain separate work. Existing synchronous `PackArchives::importFrom` still validates and imports reviewed bounded archives. No complete module/DAW release is claimed.
+This increment provides Core asynchronous export orchestration. The optional HTTP adapter exposes owned export jobs and authenticated private ZIP downloads; the optional HTTP adapter exposes archive intake and import tasks. Existing synchronous `PackArchives::importFrom` still validates and imports reviewed bounded archives. No complete module/DAW release is claimed.
 
 ### Resumable private archive inputs
 
@@ -113,7 +113,7 @@ This increment provides Core asynchronous export orchestration. The optional HTT
 
 Cancellation with retained chunks keeps the reservation charged until acknowledged quarantine collection after grace; cleanup failure cannot free the budget prematurely. No separate quota authority or public storage namespace is introduced. Temporary staging/scanning still needs disk capacity beyond this logical reservation budget.
 
-Run the purpose migration before deploying these upload changes. It defaults existing rows to audio without altering recordings. Rollback refuses active archive inputs: cancel/drain them first. Rollback preserves byte objects and upload rows, but removes the purpose metadata; cancelled inputs do not reopen. Existing audio command retries remain compatible. The optional HTTP archive-intake/import routes remain unfinished; synchronous bounded import remains available.
+Run the purpose migration before deploying these upload changes. It defaults existing rows to audio without altering recordings. Rollback refuses active archive inputs: cancel/drain them first. Rollback preserves byte objects and upload rows, but removes the purpose metadata; cancelled inputs do not reopen. Existing audio command retries remain compatible. The optional HTTP adapter exposes owned archive intake and queued import; synchronous bounded import remains available.
 
 
 ### Durable queued archive imports
@@ -125,3 +125,5 @@ Run the purpose migration before deploying these upload changes. It defaults exi
 `cancel` acknowledges queued or abandoned work immediately. Running work receives a cancellation flag checked between assets and each 1 MiB transfer chunk; initial scanner/copy preparation is not interruptible. Cancellation preserves verified recordings and reservations. The source input is cancelled automatically only after successful pack publication; its raw chunks stay charged until quarantine cleanup actually removes them.
 
 Worker leases and dispatch identities prevent delayed jobs or failure callbacks from overwriting a newer attempt. Progress restarts per attempt while underlying upload progress remains durable. `MUSIC_MEDIA_ARCHIVE_IMPORT_TIMEOUT_SECONDS` defaults to 60 and accepts integers from 60 through 3600. Set the queue connection's `retry_after` above the configured timeout plus the 15-second lease grace, and configure process supervision consistently. Expired leases can be reclaimed by replaying the original request. Deploy the task migration before workers, drain workers before rollback, and use forward recovery for completed work. Dropping the task table preserves packs, media and source uploads.
+
+Transfer adapters may pass an explicit `audio` or `archive` purpose to `MediaUploads::status`, `append` and `cancel`. This constrains both immutable purpose and owner before any byte mutation. Omitting the optional purpose retains the existing Core policy-based workspace contract. The HTTP adapter uses explicit purpose on every transfer operation.

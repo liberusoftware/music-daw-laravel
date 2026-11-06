@@ -46,6 +46,7 @@ final class ApiProblems
                     'upload' => $request->route('asset') === null ? 'upload_id' : 'replacement_upload_id',
                     'replacement' => 'replacement_upload_id',
                     'map' => 'asset_map',
+                    'input' => 'input_id',
                     'expires' => 'expires_at',
                     default => $field,
                 };

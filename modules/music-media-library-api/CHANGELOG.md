@@ -1,5 +1,11 @@
 # Changelog
 
+## Queued archive import HTTP workflow
+
+- Add owned purpose-bound private archive declaration, chunks, status and cancellation.
+- Add scoped queued import requests, progress, cooperative cancellation, terminal pack results and safe retries.
+- Review all 48 OpenAPI operations and verify live policies, scopes, ownership, purpose isolation, limits, interrupted work and real host bearer-token round trips.
+
 ## Unreleased
 
 - Add owned queued ZIP export controls, receipt polling and private actor/checksum-bound downloads with token and live rights checks.

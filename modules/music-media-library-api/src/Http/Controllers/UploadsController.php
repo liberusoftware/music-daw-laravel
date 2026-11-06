@@ -25,14 +25,14 @@ final class UploadsController
 
     public function status(Request $request, MediaUploads $uploads, string $workspace, string $upload): JsonResponse
     {
-        return $this->response($request, $uploads->status($request->user(), $workspace, $upload));
+        return $this->response($request, $uploads->status($request->user(), $workspace, $upload, 'audio'));
     }
 
     public function cancel(Request $request, CommandHeaders $headers, MediaUploads $uploads, string $workspace, string $upload): JsonResponse
     {
         $headers->key($request, $upload);
 
-        return $this->response($request, $uploads->cancel($request->user(), $workspace, $upload));
+        return $this->response($request, $uploads->cancel($request->user(), $workspace, $upload, 'audio'));
     }
 
     public function append(ChunkRequest $request, CommandHeaders $headers, MediaUploads $uploads, string $workspace, string $upload, string $offset): JsonResponse
@@ -40,7 +40,7 @@ final class UploadsController
         $checksum = $request->checksum();
         $headers->key($request, $upload.':'.$offset.':'.$checksum);
 
-        return $this->response($request, $uploads->append($request->user(), $workspace, $upload, (int) $request->validated('offset_bytes'), $request->bytes()));
+        return $this->response($request, $uploads->append($request->user(), $workspace, $upload, (int) $request->validated('offset_bytes'), $request->bytes(), 'audio'));
     }
 
     private function response(Request $request, UploadProgress $progress): JsonResponse

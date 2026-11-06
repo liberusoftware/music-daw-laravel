@@ -573,3 +573,19 @@ describe('private resumable archive inputs', function () {
             ->and($this->uploads->get($this->actor, 'studio', $this->id)->id)->toBe($this->id);
     });
 });
+
+it('can constrain transfer operations by immutable purpose and owner', function (string $purpose) {
+    app(Gate::class)->define('music.media.upload', fn () => true);
+    $command = new StartUpload('studio', $this->id, 'Input', strlen($this->bytes), hash('sha256', $this->bytes), purpose: $purpose);
+    $this->uploads->start($this->actor, $command);
+    $other = new GenericUser(['id' => 8]);
+    $wrong = $purpose === 'audio' ? 'archive' : 'audio';
+    foreach ([[$this->actor, $wrong], [$other, $purpose]] as [$actor, $filter]) {
+        expect(fn () => $this->uploads->status($actor, 'studio', $this->id, $filter))->toThrow(RecordNotFoundException::class);
+        expect(fn () => $this->uploads->append($actor, 'studio', $this->id, 0, $this->bytes, $filter))->toThrow(RecordNotFoundException::class);
+        expect(fn () => $this->uploads->cancel($actor, 'studio', $this->id, $filter))->toThrow(RecordNotFoundException::class);
+    }
+    expect($this->uploads->status($this->actor, 'studio', $this->id, $purpose)->receivedBytes)->toBe(0);
+    expect($this->uploads->append($this->actor, 'studio', $this->id, 0, $this->bytes, $purpose)->receivedBytes)->toBe(strlen($this->bytes));
+    expect($this->uploads->cancel($this->actor, 'studio', $this->id, $purpose)->status)->toBe('cancelled');
+})->with(['audio', 'archive']);

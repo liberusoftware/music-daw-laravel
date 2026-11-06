@@ -1,6 +1,6 @@
 {
   "name": "liberusoftware/music-media-library-api",
-  "description": "Authorized Music transfers, queued private ZIP exports, rights manifests, offline pins and recovery APIs.",
+  "description": "Authorized Music transfers, queued private ZIP imports/exports, rights manifests, offline pins and recovery APIs.",
   "type": "liberu-module",
   "license": "MIT",
   "version": "0.1.0",

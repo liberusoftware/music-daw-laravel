@@ -16,11 +16,12 @@ final class ApiBoundary
         $request->attributes->set('music.request_id', (string) Str::uuid());
         $request->headers->set('Accept', 'application/json');
         if ($request->isMethod('PUT') || $request->isMethod('DELETE') || $request->isMethod('POST')) {
-            $binary = $request->routeIs('music.media.api.append');
+            $binary = $request->routeIs('music.media.api.append', 'music.media.api.archive-input-append');
             $limit = match (true) {
                 $binary => 4194304,
                 $request->routeIs('music.media.api.pack-import', 'music.media.api.pack-preview') => 8388608,
                 $request->routeIs('music.media.api.pack-save') => 65536,
+                $request->routeIs('music.media.api.archive-import-request') => 131072,
                 $request->routeIs('music.media.api.pin-save') => 524288,
                 default => 8192,
             };

@@ -2,7 +2,7 @@
 
 Optional Laravel HTTP adapter for `liberusoftware/music-media-library`. The module is disabled by default. It invokes the core's public commands, query DTOs and policies; it owns no audio, identity or domain persistence.
 
-This is an **incomplete module increment**, not the full Media Library API release. The OpenAPI 3.1 contract in [openapi/media.json](openapi/media.json) covers verified metadata, keyset browsing, conditional metadata edits, authenticated resumable upload intake, queued verification/restoration/waveform tasks, short-lived scoped downloads, versioned rights/provenance pack manifests and queued private ZIP exports. Queued resumable archive import and production operational integrations remain to be implemented. Capability discovery advertises these limitations. The complete core/API/Filament/Livewire DAW scope remains open.
+This is an **incomplete module increment**, not the full Media Library API release. The OpenAPI 3.1 contract in [openapi/media.json](openapi/media.json) covers verified metadata, keyset browsing, conditional metadata edits, authenticated resumable upload intake, queued verification/restoration/waveform tasks, short-lived scoped downloads, versioned rights/provenance pack manifests and queued private ZIP imports/exports. Production operational integrations and broader acceptance remain unfinished. Capability discovery advertises these limitations. The complete core/API/Filament/Livewire DAW scope remains open.
 
 ## Installation and host configuration
 
@@ -48,7 +48,7 @@ Task responses contain `Location` plus status/result/cancel links and schema-v1 
 
 Catalog filters are `filter[query]`, `filter[tags][]` and `filter[sha256]`; `page[size]` is 1–100, default 25. Follow `meta.next_cursor` as `page[after]`. Cursors expire after 15 minutes and bind the actor, workspace, normalized filters and page size. They are encrypted, not authorization grants. Pages use descending asset UUID keysets, not recording-time order or offset pagination. Concurrent inserts ahead of the cursor appear on a fresh traversal. Every page rechecks policies.
 
-Responses use `data`, `meta.request_id`, `meta.next_cursor` and `links`. Requests get server-generated `X-Request-ID` and `Cache-Control: no-store`. Errors use `application/problem+json` with structured validation pointers, status, request ID and a generic detail; raw exception text/private paths are never serialized. Normal outcomes include 401/403/404/409/410/422/428/429/503. JSON mutation bodies are bounded to 8 KiB and routes to 60 requests per minute per authenticated throttle identity. Binary chunks are accepted only by the upload-chunk route as documented below.
+Responses use `data`, `meta.request_id`, `meta.next_cursor` and `links`. Requests get server-generated `X-Request-ID` and `Cache-Control: no-store`. Errors use `application/problem+json` with structured validation pointers, status, request ID and a generic detail; raw exception text/private paths are never serialized. Normal outcomes include 401/403/404/409/410/422/428/429/503. JSON mutation bodies are bounded to 8 KiB and routes to 60 requests per minute per authenticated throttle identity. Binary chunks are accepted only by the audio/archive chunk routes as documented below.
 
 No server action invokes native audio, MIDI, transport or device scheduling. No source object keys, scanner paths or private retention records are exposed. Core scanner/rights-policy requirements are unchanged.
 
@@ -138,7 +138,7 @@ Recovery and cancellation serialize on the task record. Recovery validates origi
 
 ### Queued private archive exports
 
-All archive routes require `music.media.read`, `music.media.packs.export` and `music.media.archives.export`, current Core pack/asset distribution policies and foundation transfer approval for `music-media-pack` / `export`. Tasks belong to the authenticated actor inside the workspace. A manifest-export token alone does not authorize archive bytes.
+All archive export routes require `music.media.read`, `music.media.packs.export` and `music.media.archives.export`, current Core pack/asset distribution policies and foundation transfer approval for `music-media-pack` / `export`. Tasks belong to the authenticated actor inside the workspace. A manifest-export token alone does not authorize archive bytes.
 
 | Method and workspace-relative route | Contract |
 | --- | --- |
@@ -151,4 +151,42 @@ All archive routes require `music.media.read`, `music.media.packs.export` and `m
 
 Workers use the canonical requester and recheck rights before generating a bounded archive. Result/status reads and downloads recheck current policies too. Core verifies the full ZIP size/checksum into a private disk snapshot before successful binary headers; missing/corrupt artifacts fail closed. Temporary disk/time scale with archive size while PHP memory remains bounded. Issuing a URL authorizes retrieval but cannot guarantee storage availability at redemption. Tokens can be revoked immediately; an already streaming response cannot be recalled.
 
-Artifacts expire one hour after generation and cannot be reopened with the same task identity. Failed same-command retries can requeue; cancelled/ready/expired identities remain terminal. A queue-dispatch outage after SQL commit leaves a queued task which the same command can safely redispatch. Operator cleanup remains the Core public action described in its README; no HTTP cleanup/purge endpoint is exposed. Existing synchronous manifest import does not accept ZIP/audio bytes, and queued resumable ZIP import remains unsupported.
+Artifacts expire one hour after generation and cannot be reopened with the same task identity. Failed same-command retries can requeue; cancelled/ready/expired identities remain terminal. A queue-dispatch outage after SQL commit leaves a queued task which the same command can safely redispatch. Operator cleanup remains the Core public action described in its README; no HTTP cleanup/purge endpoint is exposed. Existing synchronous manifest import does not accept ZIP/audio bytes, and ZIP import uses the separate intake/import task routes below.
+
+
+### Private archive intake and queued imports
+
+Archive intake requires both `music.media.upload` and `music.media.archives.import`, plus the live Core upload policy. Every intake status/chunk/cancel operation is owned by the authenticated actor and fixed to archive purpose. Audio upload routes are fixed to audio purpose and owner; a workspace-wide upload grant cannot read or modify another actor's intake. Wrong purpose/owner/workspace returns 404. Declaration UUID collisions return 409 without revealing private content.
+
+| Method and workspace-relative route | Contract |
+| --- | --- |
+| PUT `archive-inputs/{upload}` | Same declaration shape as audio (`name`, integer `bytes`, SHA-256, optional provenance), with Idempotency-Key equal to upload UUID. Reserves private Core capacity. |
+| GET `archive-inputs/{upload}` | Owned byte progress, with no private storage paths. |
+| PUT `archive-inputs/{upload}/chunks/{offset}` | Raw octet-stream bytes, lowercase `X-Chunk-SHA256`, and Idempotency-Key `upload UUID:offset:sha256`. Append the next explicit byte offset or replay identical bytes. |
+| DELETE `archive-inputs/{upload}` | Matching UUID Idempotency-Key cancels intake; charges remain until Core quarantine cleanup actually removes retained chunks. |
+
+Each chunk is 1 byte–4 MiB, with at most 8192 chunks. Archive declarations accept 44 bytes through configured `MUSIC_MEDIA_ARCHIVE_MAX_AUDIO_BYTES + 16 MiB` (default 1 GiB + 16 MiB; hard ceiling 16 GiB + 16 MiB). Plan chunk sizes to fit that bound. JSON declarations are limited to 8 KiB. Archive ZIP inputs never become verified playable audio, even if an audio verification job is requested. Complete intake still requires worker scanner approval, whole-file checksum verification and bounded ZIP/manifest/rights validation.
+
+Import task routes require all four abilities: `music.media.read`, `music.media.upload`, `music.media.packs.import`, and `music.media.archives.import`. Core also checks current import/upload/retention/pack policies and foundation `music-media-pack` / `import` authorization. Token abilities do not grant rights in a pack's contained recordings.
+
+| Method and workspace-relative route | Contract |
+| --- | --- |
+| PUT `packs/{pack}/archive-import-tasks/{task}` | Matching task UUID Idempotency-Key and JSON `input_id` plus exact source UUID → distinct destination UUID `asset_map` (1–1000 assets). New pack UUID, stable task/input/mapping identities. Body limit 128 KiB. |
+| GET `archive-import-tasks/{task}` | Owned task status, processed-asset progress, safe error code and terminal/cancellable/retryable flags. |
+| GET `archive-import-tasks/{task}/result` | 202 with Retry-After: 2 while queued/running; verified imported pack and quoted revision ETag when ready; 409 for failed/cancelled. Current read policies and audio availability are rechecked. |
+| DELETE `archive-import-tasks/{task}` | Matching task UUID Idempotency-Key. Queued work cancels immediately; running work returns 202 with a cooperative cancellation flag. |
+
+For example, submit an already uploaded archive using a new destination pack and task UUID:
+
+```json
+{
+  "input_id": "11111111-1111-4111-8111-111111111111",
+  "asset_map": {
+    "22222222-2222-4222-8222-222222222222": "33333333-3333-4333-8333-333333333333"
+  }
+}
+```
+
+Replay the original PUT to redispatch queued work, retry failure or reclaim an expired lease. Changed identities conflict. One input has one queued/running consumer at a time; failed/cancelled consumers allow a new task, while ready/cancelled task UUIDs never reopen. PUT returns 202 for queued/running and 200 for terminal replays. Status responses include Location and status/result/cancel links. Cancellation checks between assets and 1 MiB chunks; scanner/copy preparation is not interruptible. Already verified destination recordings survive interruption and remain available for a stable retry; progress counts restart each attempt. No incomplete pack is published. Pack publication, retention, source-input cancellation and ready acknowledgement commit atomically.
+
+Use an asynchronous worker connection for HTTP imports. The Core job timeout defaults to 60 seconds and may be configured from 60–3600; queue retry_after must exceed that timeout plus 15 seconds. A sync queue runs import inline and is unsuitable for large HTTP imports. Run Core migrations before workers and drain them before rollback. Source chunks cancelled on successful import remain charged until acknowledged quarantine cleanup. Production scanner, rights policies, queue supervision, quota capacity and operator scheduling remain host responsibilities. No public purge/cleanup endpoint is exposed.

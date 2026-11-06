@@ -1,5 +1,10 @@
 # Changelog
 
+## Transfer purpose and ownership constraints
+
+- Allow public upload transfer operations to constrain purpose and owner atomically, preserving existing Core callers.
+- Document the optional HTTP archive intake/import consumer.
+
 ## Queued archive import orchestration
 
 - Add owned after-commit import jobs with canonical actor checks, resumable audio progress, worker leases and cooperative cancellation.

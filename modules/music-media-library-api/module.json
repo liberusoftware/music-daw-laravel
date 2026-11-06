@@ -2,7 +2,7 @@
   "$schema": "https://schemas.liberu.dev/module/v1.json",
   "name": "music-media-library-api",
   "display_name": "Music Media Library API",
-  "description": "Authorized Music transfers, queued private ZIP exports, rights manifests, offline pins and recovery APIs.",
+  "description": "Authorized Music transfers, queued private ZIP imports/exports, rights manifests, offline pins and recovery APIs.",
   "version": "0.1.0",
   "category": "presentation",
   "provider": "Liberu\\Music\\MediaLibraryApi\\MusicMediaLibraryApiServiceProvider",
@@ -28,6 +28,8 @@
     "Conditional versioned rights packs and reviewed checksummed manifest transfer",
     "Conditional actor-owned offline pin sets, renewal and release",
     "Durable actor-owned queued integrity-verified trash recovery and protected lifecycle HTTP commands",
-    "Owned queued private ZIP export tasks and short-lived authenticated archive downloads"
+    "Owned queued private ZIP export tasks and short-lived authenticated archive downloads",
+    "Owned purpose-bound resumable private archive intake",
+    "Scoped queued ZIP import with resumable progress, cooperative cancellation and verified pack results"
   ]
 }

@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Liberu\Foundation\Files\Contracts\MalwareScanner;
 use Liberu\Foundation\ImportExport\Contracts\TransferAuthorizer;
-use Liberu\Music\MediaLibrary\Commands\RequestArchiveImport;
 use Liberu\Music\MediaLibrary\Commands\SaveMediaPack;
 use Liberu\Music\MediaLibrary\Commands\StartUpload;
 use Liberu\Music\MediaLibrary\Exceptions\ArchiveResultExpired;
@@ -56,7 +55,7 @@ it('exports a reviewed pack on a canonical host worker and expires only its priv
         $pack = (string) Str::uuid();
         app(MediaPacks::class)->save($actor, new SaveMediaPack('studio', $pack, 'Studio originals', [$asset], $rights, 0, 'save'));
         $jobs = app(ArchiveExports::class);
-        $token = $actor->createToken('archive-export', ['music.media.read', 'music.media.packs.export', 'music.media.archives.export'])->plainTextToken;
+        $token = $actor->createToken('archive-export', ['music.media.read', 'music.media.upload', 'music.media.packs.export', 'music.media.archives.export', 'music.media.packs.import', 'music.media.archives.import'])->plainTextToken;
         $this->withToken($token);
         $taskId = (string) Str::uuid();
         $base = '/api/v1/music-media/workspaces/studio';
@@ -72,20 +71,29 @@ it('exports a reviewed pack on a canonical host worker and expires only its priv
         expect(hash('sha256', $zipBytes))->toBe($receipt->json('data.sha256'));
         $this->getJson($taskUrl)->assertSuccessful()->assertJsonPath('data.status', 'ready');
         $inputId = (string) Str::uuid();
-        $uploads->start($actor, new StartUpload('studio', $inputId, 'Transfer.zip', strlen($zipBytes), hash('sha256', $zipBytes), purpose: 'archive'));
-        $uploads->append($actor, 'studio', $inputId, 0, substr($zipBytes, 0, 20));
-        $uploads->append($actor, 'studio', $inputId, 20, substr($zipBytes, 20));
+        $inputUrl = $base.'/archive-inputs/'.$inputId;
+        $this->withHeader('Idempotency-Key', $inputId)->putJson($inputUrl, ['name' => 'Transfer.zip', 'bytes' => strlen($zipBytes), 'sha256' => hash('sha256', $zipBytes)])->assertSuccessful();
+        foreach ([0 => substr($zipBytes, 0, 20), 20 => substr($zipBytes, 20)] as $offset => $chunk) {
+            $checksum = hash('sha256', $chunk);
+            $this->call('PUT', $inputUrl.'/chunks/'.$offset, [], [], [], ['CONTENT_TYPE' => 'application/octet-stream',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token, 'HTTP_X_CHUNK_SHA256' => $checksum,
+                'HTTP_IDEMPOTENCY_KEY' => $inputId.':'.$offset.':'.$checksum], $chunk)->assertSuccessful();
+        }
         $importedAsset = (string) Str::uuid();
         $imports = app(ArchiveImports::class);
         $importId = (string) Str::uuid();
-        $imports->request($actor, new RequestArchiveImport('studio', $importId, $inputId, (string) Str::uuid(), [$asset => $importedAsset]));
-        expect($imports->get($actor, 'studio', $importId)->status)->toBe('queued')->and($imports->result($actor, 'studio', $importId))->toBeNull();
+        $importPack = (string) Str::uuid();
+        $importUrl = $base.'/archive-import-tasks/'.$importId;
+        $this->withHeader('Idempotency-Key', $importId)->putJson($base.'/packs/'.$importPack.'/archive-import-tasks/'.$importId,
+            ['input_id' => $inputId, 'asset_map' => [$asset => $importedAsset]])->assertAccepted();
+        $this->getJson($importUrl)->assertSuccessful()->assertJsonPath('data.status', 'queued');
+        $this->getJson($importUrl.'/result')->assertAccepted()->assertHeader('Retry-After', '2');
         Bus::assertDispatched(ImportPackArchiveTask::class, fn ($job) => $job->taskId === $importId);
         Bus::dispatched(ImportPackArchiveTask::class)->first(fn ($job) => $job->taskId === $importId)->handle($imports);
-        $importedPack = $imports->result($actor, 'studio', $importId);
-        expect($importedPack->version)->toBe(1)->and($uploads->get($actor, 'studio', $importedAsset)->reference()['sha256'])->toBe(hash('sha256', $bytes));
+        $this->getJson($importUrl.'/result')->assertSuccessful()->assertHeader('ETag', '"1"')->assertJsonPath('data.version', 1)
+            ->assertJsonPath('data.assets.0.reference.id', $importedAsset)->assertJsonPath('data.assets.0.reference.sha256', hash('sha256', $bytes));
+        $this->getJson($inputUrl)->assertSuccessful()->assertJsonPath('data.status', 'cancelled');
         expect(fn () => $uploads->get($actor, 'studio', $inputId))->toThrow(RecordNotFoundException::class);
-        $uploads->cancel($actor, 'studio', $inputId);
         $this->travel(3601)->seconds();
         expect(fn () => $jobs->open($actor, 'studio', $taskId))->toThrow(ArchiveResultExpired::class);
         expect($jobs->cleanup($actor, 'studio'))->toBe(1)->and($jobs->get($actor, 'studio', $taskId)->status)->toBe('expired')
@@ -96,6 +104,8 @@ it('exports a reviewed pack on a canonical host worker and expires only its priv
         app('auth')->forgetGuards();
         $this->getJson($taskUrl)->assertUnauthorized();
         $this->get($grant->json('data.url'))->assertUnauthorized();
+        $this->getJson($importUrl.'/result')->assertUnauthorized();
+        $this->getJson($inputUrl)->assertUnauthorized();
     } finally {
         DB::purge('music_archive_worker');
         DB::setDefaultConnection($previous);

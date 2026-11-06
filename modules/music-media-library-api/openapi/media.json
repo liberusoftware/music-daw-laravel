@@ -3,7 +3,7 @@
   "info": {
     "title": "Music Media Library API",
     "version": "0.1.0",
-    "description": "Authorized Media Library metadata, resumable authenticated uploads and queued verification/restoration/waveform jobs. Read, edit, upload, restore, process and quota abilities remain separate and never replace core policies. Scoped download URLs, packs, pins and lifecycle HTTP commands remain unfinished. No native/device audio execution.",
+    "description": "Authorized verified audio, metadata, resumable private audio/archive inputs, queued verification/restoration/waveform and pack ZIP transfer jobs. Token abilities complement live Core policies. No native audio/device execution.",
     "license": {
       "name": "MIT",
       "identifier": "MIT"
@@ -4622,7 +4622,7 @@
           "Media"
         ],
         "summary": "Queue a private ZIP export for an explicit pack revision",
-        "description": "Requires music.media.read, music.media.packs.export and music.media.archives.export token abilities, current Core distribution/asset policies and foundation music-media-pack/export approval. Tasks are actor/workspace owned and pin an explicit pack revision. Artifacts expire one hour after generation; failed/cancelled results return 409, expired results 410. No public URL or storage path is issued. Queued ZIP import remains unsupported.",
+        "description": "Requires music.media.read, music.media.packs.export and music.media.archives.export token abilities, current Core distribution/asset policies and foundation music-media-pack/export approval. Tasks are actor/workspace owned and pin an explicit pack revision. Artifacts expire one hour after generation; failed/cancelled results return 409, expired results 410. No public URL or storage path is issued. Queued ZIP import uses the archive input and import task operations.",
         "responses": {
           "200": {
             "description": "Authorized result.",
@@ -4828,7 +4828,7 @@
           "Media"
         ],
         "summary": "Read an actor-owned archive export task",
-        "description": "Requires music.media.read, music.media.packs.export and music.media.archives.export token abilities, current Core distribution/asset policies and foundation music-media-pack/export approval. Tasks are actor/workspace owned and pin an explicit pack revision. Artifacts expire one hour after generation; failed/cancelled results return 409, expired results 410. No public URL or storage path is issued. Queued ZIP import remains unsupported.",
+        "description": "Requires music.media.read, music.media.packs.export and music.media.archives.export token abilities, current Core distribution/asset policies and foundation music-media-pack/export approval. Tasks are actor/workspace owned and pin an explicit pack revision. Artifacts expire one hour after generation; failed/cancelled results return 409, expired results 410. No public URL or storage path is issued. Queued ZIP import uses the archive input and import task operations.",
         "responses": {
           "200": {
             "description": "Authorized result.",
@@ -4921,7 +4921,7 @@
           "Media"
         ],
         "summary": "Cancel queued archive export before publication wins",
-        "description": "Requires music.media.read, music.media.packs.export and music.media.archives.export token abilities, current Core distribution/asset policies and foundation music-media-pack/export approval. Tasks are actor/workspace owned and pin an explicit pack revision. Artifacts expire one hour after generation; failed/cancelled results return 409, expired results 410. No public URL or storage path is issued. Queued ZIP import remains unsupported.",
+        "description": "Requires music.media.read, music.media.packs.export and music.media.archives.export token abilities, current Core distribution/asset policies and foundation music-media-pack/export approval. Tasks are actor/workspace owned and pin an explicit pack revision. Artifacts expire one hour after generation; failed/cancelled results return 409, expired results 410. No public URL or storage path is issued. Queued ZIP import uses the archive input and import task operations.",
         "responses": {
           "200": {
             "description": "Authorized result.",
@@ -5051,7 +5051,7 @@
           "Media"
         ],
         "summary": "Resolve a verified archive transfer receipt",
-        "description": "Requires music.media.read, music.media.packs.export and music.media.archives.export token abilities, current Core distribution/asset policies and foundation music-media-pack/export approval. Tasks are actor/workspace owned and pin an explicit pack revision. Artifacts expire one hour after generation; failed/cancelled results return 409, expired results 410. No public URL or storage path is issued. Queued ZIP import remains unsupported.",
+        "description": "Requires music.media.read, music.media.packs.export and music.media.archives.export token abilities, current Core distribution/asset policies and foundation music-media-pack/export approval. Tasks are actor/workspace owned and pin an explicit pack revision. Artifacts expire one hour after generation; failed/cancelled results return 409, expired results 410. No public URL or storage path is issued. Queued ZIP import uses the archive input and import task operations.",
         "responses": {
           "200": {
             "description": "Authorized result.",
@@ -5219,7 +5219,7 @@
           "Media"
         ],
         "summary": "Issue a short-lived actor-scoped archive download URL",
-        "description": "Requires music.media.read, music.media.packs.export and music.media.archives.export token abilities, current Core distribution/asset policies and foundation music-media-pack/export approval. Tasks are actor/workspace owned and pin an explicit pack revision. Artifacts expire one hour after generation; failed/cancelled results return 409, expired results 410. No public URL or storage path is issued. Queued ZIP import remains unsupported. URL expiry is the earlier of 60 seconds and the artifact expiry. A valid URL still requires a current bearer token and live rights; it does not guarantee storage availability.",
+        "description": "Requires music.media.read, music.media.packs.export and music.media.archives.export token abilities, current Core distribution/asset policies and foundation music-media-pack/export approval. Tasks are actor/workspace owned and pin an explicit pack revision. Artifacts expire one hour after generation; failed/cancelled results return 409, expired results 410. No public URL or storage path is issued. Queued ZIP import uses the archive input and import task operations. URL expiry is the earlier of 60 seconds and the artifact expiry. A valid URL still requires a current bearer token and live rights; it does not guarantee storage availability.",
         "responses": {
           "200": {
             "description": "Authorized result.",
@@ -5334,7 +5334,7 @@
           "Media"
         ],
         "summary": "Download an integrity-verified private ZIP archive",
-        "description": "Requires music.media.read, music.media.packs.export and music.media.archives.export token abilities, current Core distribution/asset policies and foundation music-media-pack/export approval. Tasks are actor/workspace owned and pin an explicit pack revision. Artifacts expire one hour after generation; failed/cancelled results return 409, expired results 410. No public URL or storage path is issued. Queued ZIP import remains unsupported. Range requests return 416. Core verifies the complete artifact into a private disk snapshot before successful response headers, with bounded PHP memory.",
+        "description": "Requires music.media.read, music.media.packs.export and music.media.archives.export token abilities, current Core distribution/asset policies and foundation music-media-pack/export approval. Tasks are actor/workspace owned and pin an explicit pack revision. Artifacts expire one hour after generation; failed/cancelled results return 409, expired results 410. No public URL or storage path is issued. Queued ZIP import uses the archive input and import task operations. Range requests return 416. Core verifies the complete artifact into a private disk snapshot before successful response headers, with bounded PHP memory.",
         "responses": {
           "200": {
             "description": "Full verified ZIP attachment; quoted checksum ETag, byte length, no-store, nosniff and Accept-Ranges: none.",
@@ -5428,6 +5428,1093 @@
             }
           }
         ]
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/archive-inputs/{upload}": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "upload",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "put": {
+        "operationId": "mediaDeclareArchiveInput",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Declare a resumable private archive input and reserve capacity",
+        "description": "Requires music.media.upload and music.media.archives.import abilities plus current Core upload policy. Archive-purpose inputs are owned by the requester. Ordinary audio upload routes cannot access them. JSON bodies are bounded to 8 KiB; raw chunks to 4 MiB. Idempotency-Key is input UUID, or input UUID:offset:sha256 for a chunk. At most 8192 chunks; declaration bytes are capped at configured archive audio bytes + 16 MiB (default 1 GiB + 16 MiB, hard ceiling 16 GiB + 16 MiB). Inputs stay quarantined and never become playable audio.",
+        "responses": {
+          "200": {
+            "description": "Authorized result or original command receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/UploadProgress"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArchiveInputDeclaration"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Stable printable ASCII key. For task/declaration commands this must equal the path UUID; for chunks use upload UUID:offset:sha256."
+          }
+        ]
+      },
+      "get": {
+        "operationId": "mediaArchiveInputStatus",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Read workspace-authorized archive input byte progress",
+        "description": "Requires music.media.upload and music.media.archives.import abilities plus current Core upload policy. Archive-purpose inputs are owned by the requester. Ordinary audio upload routes cannot access them. JSON bodies are bounded to 8 KiB; raw chunks to 4 MiB. Idempotency-Key is input UUID, or input UUID:offset:sha256 for a chunk. At most 8192 chunks; declaration bytes are capped at configured archive audio bytes + 16 MiB (default 1 GiB + 16 MiB, hard ceiling 16 GiB + 16 MiB). Inputs stay quarantined and never become playable audio.",
+        "responses": {
+          "200": {
+            "description": "Authorized result or original command receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/UploadProgress"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "mediaCancelArchiveInput",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Cancel an unpublished archive input without bypassing quarantine grace",
+        "description": "Requires music.media.upload and music.media.archives.import abilities plus current Core upload policy. Archive-purpose inputs are owned by the requester. Ordinary audio upload routes cannot access them. JSON bodies are bounded to 8 KiB; raw chunks to 4 MiB. Idempotency-Key is input UUID, or input UUID:offset:sha256 for a chunk. At most 8192 chunks; declaration bytes are capped at configured archive audio bytes + 16 MiB (default 1 GiB + 16 MiB, hard ceiling 16 GiB + 16 MiB). Inputs stay quarantined and never become playable audio.",
+        "responses": {
+          "200": {
+            "description": "Authorized result or original command receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/UploadProgress"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Stable printable ASCII key. For task/declaration commands this must equal the path UUID; for chunks use upload UUID:offset:sha256."
+          }
+        ]
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/archive-inputs/{upload}/chunks/{offset}": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "upload",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "offset",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 17196646400
+          }
+        }
+      ],
+      "put": {
+        "operationId": "mediaAppendArchiveChunk",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Append or replay a verified resumable byte chunk",
+        "description": "Requires music.media.upload and music.media.archives.import abilities plus current Core upload policy. Archive-purpose inputs are owned by the requester. Ordinary audio upload routes cannot access them. JSON bodies are bounded to 8 KiB; raw chunks to 4 MiB. Idempotency-Key is input UUID, or input UUID:offset:sha256 for a chunk. At most 8192 chunks; declaration bytes are capped at configured archive audio bytes + 16 MiB (default 1 GiB + 16 MiB, hard ceiling 16 GiB + 16 MiB). Inputs stay quarantined and never become playable audio.",
+        "responses": {
+          "200": {
+            "description": "Authorized result or original command receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/UploadProgress"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "415": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Stable printable ASCII key. For task/declaration commands this must equal the path UUID; for chunks use upload UUID:offset:sha256."
+          },
+          {
+            "name": "X-Chunk-SHA256",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "description": "SHA-256 of exactly the raw chunk bytes."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "minLength": 1,
+                "maxLength": 4194304
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/packs/{pack}/archive-import-tasks/{task}": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "pack",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "put": {
+        "operationId": "mediaArchiveImportRequest",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Queue a verified ZIP import into a new destination pack",
+        "description": "Requires music.media.read, music.media.upload, music.media.packs.import and music.media.archives.import token abilities, current Core import/upload/retention/pack policies and foundation music-media-pack/import approval. Tasks and inputs are actor/workspace owned. Stable task UUID, new pack UUID, input UUID and exact UUID mapping form immutable command identity. JSON is bounded to 128 KiB. Queued/running result polling returns 202 with Retry-After: 2; failed/cancelled results return 409. Running cancellation is cooperative. Failed same-command retries preserve verified audio; final pack publication and task acknowledgement commit atomically. Successful import cancels its input; quota is released only after actual chunk cleanup.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ArchiveImportTask"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "410": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "202": {
+            "description": "Queued or running; poll the owned task/result. Result polling includes Retry-After: 2.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ArchiveImportTask"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "The stable task UUID in the route.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArchiveImportCommand"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/archive-import-tasks/{task}": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "mediaArchiveImportRead",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Read an actor-owned archive import task",
+        "description": "Requires music.media.read, music.media.upload, music.media.packs.import and music.media.archives.import token abilities, current Core import/upload/retention/pack policies and foundation music-media-pack/import approval. Tasks and inputs are actor/workspace owned. Stable task UUID, new pack UUID, input UUID and exact UUID mapping form immutable command identity. JSON is bounded to 128 KiB. Queued/running result polling returns 202 with Retry-After: 2; failed/cancelled results return 409. Running cancellation is cooperative. Failed same-command retries preserve verified audio; final pack publication and task acknowledgement commit atomically. Successful import cancels its input; quota is released only after actual chunk cleanup.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ArchiveImportTask"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "410": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "mediaArchiveImportCancel",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Cancel queued work or request cooperative cancellation of running import",
+        "description": "Requires music.media.read, music.media.upload, music.media.packs.import and music.media.archives.import token abilities, current Core import/upload/retention/pack policies and foundation music-media-pack/import approval. Tasks and inputs are actor/workspace owned. Stable task UUID, new pack UUID, input UUID and exact UUID mapping form immutable command identity. JSON is bounded to 128 KiB. Queued/running result polling returns 202 with Retry-After: 2; failed/cancelled results return 409. Running cancellation is cooperative. Failed same-command retries preserve verified audio; final pack publication and task acknowledgement commit atomically. Successful import cancels its input; quota is released only after actual chunk cleanup.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ArchiveImportTask"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "410": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "428": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "202": {
+            "description": "Running worker has received the cancellation flag; poll until acknowledged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ArchiveImportTask"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "The stable task UUID in the route.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/music-media/workspaces/{workspace}/archive-import-tasks/{task}/result": {
+      "parameters": [
+        {
+          "name": "workspace",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        {
+          "name": "task",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "mediaArchiveImportResult",
+        "tags": [
+          "Media"
+        ],
+        "summary": "Resolve a verified imported pack",
+        "description": "Requires music.media.read, music.media.upload, music.media.packs.import and music.media.archives.import token abilities, current Core import/upload/retention/pack policies and foundation music-media-pack/import approval. Tasks and inputs are actor/workspace owned. Stable task UUID, new pack UUID, input UUID and exact UUID mapping form immutable command identity. JSON is bounded to 128 KiB. Queued/running result polling returns 202 with Retry-After: 2; failed/cancelled results return 409. Running cancellation is cooperative. Failed same-command retries preserve verified audio; final pack publication and task acknowledgement commit atomically. Successful import cancels its input; quota is released only after actual chunk cleanup.",
+        "responses": {
+          "200": {
+            "description": "Authorized result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MediaPack"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong quoted imported pack version.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "410": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "202": {
+            "description": "Queued or running; poll the owned task/result. Result polling includes Retry-After: 2.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta",
+                    "links"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ArchiveImportTask"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "request_id",
+                        "next_cursor"
+                      ],
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -6718,6 +7805,188 @@
               "unit": {
                 "type": "string",
                 "const": "pack_archive_export"
+              }
+            }
+          }
+        }
+      },
+      "ArchiveInputDeclaration": {
+        "type": "object",
+        "required": [
+          "name",
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 44,
+            "maximum": 17196646400
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "source": {
+                "type": "string",
+                "maxLength": 2048
+              },
+              "license": {
+                "type": "string",
+                "maxLength": 2048
+              },
+              "attribution": {
+                "type": "string",
+                "maxLength": 2048
+              }
+            }
+          }
+        }
+      },
+      "ArchiveImportCommand": {
+        "type": "object",
+        "required": [
+          "input_id",
+          "asset_map"
+        ],
+        "properties": {
+          "input_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "asset_map": {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 1000,
+            "propertyNames": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Exact source UUID to distinct destination audio upload UUID mapping. Input UUID cannot be a destination."
+          }
+        }
+      },
+      "ArchiveImportTask": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "workspace_id",
+          "input_id",
+          "pack_id",
+          "kind",
+          "status",
+          "attempt",
+          "cancel_requested",
+          "terminal",
+          "cancellable",
+          "retryable",
+          "result_version",
+          "error_code",
+          "progress"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspace_id": {
+            "type": "string"
+          },
+          "input_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pack_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "const": "import_pack_archive"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "ready",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cancel_requested": {
+            "type": "boolean"
+          },
+          "terminal": {
+            "type": "boolean"
+          },
+          "cancellable": {
+            "type": "boolean"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "result_version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              null,
+              "archive_import_failed",
+              "archive_import_stalled"
+            ]
+          },
+          "progress": {
+            "type": "object",
+            "required": [
+              "completed_steps",
+              "total_steps",
+              "unit"
+            ],
+            "properties": {
+              "completed_steps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000
+              },
+              "total_steps": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              },
+              "unit": {
+                "type": "string",
+                "const": "processed_assets"
               }
             }
           }

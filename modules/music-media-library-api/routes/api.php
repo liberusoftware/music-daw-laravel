@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\ArchiveExportsController;
+use Liberu\Music\MediaLibraryApi\Http\Controllers\ArchiveImportsController;
+use Liberu\Music\MediaLibraryApi\Http\Controllers\ArchiveInputsController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\AssetTasksController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\DownloadsController;
 use Liberu\Music\MediaLibraryApi\Http\Controllers\LifecycleController;
@@ -18,6 +20,12 @@ use Liberu\Music\MediaLibraryApi\Http\Middleware\RequireMedia;
 Route::prefix('api/v1/music-media/workspaces/{workspace}')->where(['workspace' => '[A-Za-z0-9_-]{1,128}'])
     ->name('music.media.api.')->middleware([ApiBoundary::class, 'auth:sanctum', RequireMedia::class, 'throttle:60,1'])->group(function () {
         Route::middleware(CheckAbilities::class.':music.media.read')->group(function () {
+            Route::middleware(CheckAbilities::class.':music.media.upload,music.media.packs.import,music.media.archives.import')->group(function () {
+                Route::put('/packs/{pack}/archive-import-tasks/{task}', [ArchiveImportsController::class, 'request'])->whereUuid('pack')->whereUuid('task')->name('archive-import-request');
+                Route::get('/archive-import-tasks/{task}', [ArchiveImportsController::class, 'show'])->whereUuid('task')->name('archive-import');
+                Route::get('/archive-import-tasks/{task}/result', [ArchiveImportsController::class, 'result'])->whereUuid('task')->name('archive-import-result');
+                Route::delete('/archive-import-tasks/{task}', [ArchiveImportsController::class, 'cancel'])->whereUuid('task')->name('archive-import-cancel');
+            });
             Route::put('/packs/{pack}/archive-export-tasks/{task}', [ArchiveExportsController::class, 'request'])->whereUuid('task')->whereUuid('pack')->middleware(CheckAbilities::class.':music.media.packs.export,music.media.archives.export')->name('archive-export-request');
             Route::get('/archive-export-tasks/{task}', [ArchiveExportsController::class, 'show'])->whereUuid('task')->middleware(CheckAbilities::class.':music.media.packs.export,music.media.archives.export')->name('archive-export');
             Route::delete('/archive-export-tasks/{task}', [ArchiveExportsController::class, 'cancel'])->whereUuid('task')->middleware(CheckAbilities::class.':music.media.packs.export,music.media.archives.export')->name('archive-export-cancel');
@@ -55,6 +63,12 @@ Route::prefix('api/v1/music-media/workspaces/{workspace}')->where(['workspace' =
             Route::delete('/waveform-tasks/{task}', [MediaController::class, 'cancel'])->whereUuid('task')->middleware(CheckAbilities::class.':music.media.process')->name('cancel');
         });
         Route::middleware(CheckAbilities::class.':music.media.upload')->group(function () {
+            Route::middleware(CheckAbilities::class.':music.media.archives.import')->group(function () {
+                Route::put('/archive-inputs/{upload}', [ArchiveInputsController::class, 'declare'])->whereUuid('upload')->name('archive-input-declare');
+                Route::get('/archive-inputs/{upload}', [ArchiveInputsController::class, 'status'])->whereUuid('upload')->name('archive-input');
+                Route::delete('/archive-inputs/{upload}', [ArchiveInputsController::class, 'cancel'])->whereUuid('upload')->name('archive-input-cancel');
+                Route::put('/archive-inputs/{upload}/chunks/{offset}', [ArchiveInputsController::class, 'append'])->whereUuid('upload')->where('offset', '0|[1-9][0-9]{0,10}')->name('archive-input-append');
+            });
             Route::put('/uploads/{upload}', [UploadsController::class, 'declare'])->whereUuid('upload')->name('declare');
             Route::get('/uploads/{upload}', [UploadsController::class, 'status'])->whereUuid('upload')->name('upload-status');
             Route::delete('/uploads/{upload}', [UploadsController::class, 'cancel'])->whereUuid('upload')->name('cancel-upload');

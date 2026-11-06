@@ -6,6 +6,7 @@ namespace Liberu\Music\MediaLibraryApi\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\ValidationException;
+use Liberu\Music\MediaLibrary\Support\ArchiveInputLimit;
 
 final class ChunkRequest extends FormRequest
 {
@@ -16,7 +17,9 @@ final class ChunkRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['offset_bytes' => ['required', 'integer', 'between:0,1073741824'], 'chunk_bytes' => ['integer:strict', 'between:1,4194304'],
+        $limit = $this->routeIs('music.media.api.archive-input-append') ? ArchiveInputLimit::bytes() : 1073741824;
+
+        return ['offset_bytes' => ['required', 'integer', 'between:0,'.$limit], 'chunk_bytes' => ['integer:strict', 'between:1,4194304'],
             'headers.X-Chunk-SHA256' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/D']];
     }
 

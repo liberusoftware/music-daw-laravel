@@ -101,14 +101,14 @@ final readonly class MediaUploads
         }, 3);
     }
 
-    public function status(Authenticatable $actor, string $workspaceId, string $uploadId): UploadProgress
+    public function status(Authenticatable $actor, string $workspaceId, string $uploadId, ?string $purpose = null): UploadProgress
     {
         $this->access->authorize($actor, $workspaceId, $uploadId, 'upload');
 
-        return $this->progress($this->upload($workspaceId, $uploadId)->firstOrFail());
+        return $this->progress($this->transferUpload($actor, $workspaceId, $uploadId, $purpose)->firstOrFail());
     }
 
-    public function append(Authenticatable $actor, string $workspaceId, string $uploadId, int $offsetBytes, string $bytes): UploadProgress
+    public function append(Authenticatable $actor, string $workspaceId, string $uploadId, int $offsetBytes, string $bytes, ?string $purpose = null): UploadProgress
     {
         $this->access->authorize($actor, $workspaceId, $uploadId, 'upload');
         Validator::make(['offset' => $offsetBytes, 'length' => strlen($bytes)], [
@@ -116,8 +116,8 @@ final readonly class MediaUploads
         ])->validate();
         $checksum = hash('sha256', $bytes);
 
-        return $this->database->transaction(function () use ($workspaceId, $uploadId, $offsetBytes, $bytes, $checksum): UploadProgress {
-            $upload = $this->upload($workspaceId, $uploadId)->lockForUpdate()->firstOrFail();
+        return $this->database->transaction(function () use ($actor, $workspaceId, $uploadId, $offsetBytes, $bytes, $checksum, $purpose): UploadProgress {
+            $upload = $this->transferUpload($actor, $workspaceId, $uploadId, $purpose)->lockForUpdate()->firstOrFail();
             if ($upload->status === 'cancelled') {
                 throw new UploadConflict('This upload was cancelled.');
             }
@@ -250,12 +250,12 @@ final readonly class MediaUploads
         return $this->asset($upload);
     }
 
-    public function cancel(Authenticatable $actor, string $workspaceId, string $uploadId): UploadProgress
+    public function cancel(Authenticatable $actor, string $workspaceId, string $uploadId, ?string $purpose = null): UploadProgress
     {
         $this->access->authorize($actor, $workspaceId, $uploadId, 'upload');
 
-        return $this->database->transaction(function () use ($actor, $workspaceId, $uploadId): UploadProgress {
-            $upload = $this->upload($workspaceId, $uploadId)->lockForUpdate()->firstOrFail();
+        return $this->database->transaction(function () use ($actor, $workspaceId, $uploadId, $purpose): UploadProgress {
+            $upload = $this->transferUpload($actor, $workspaceId, $uploadId, $purpose)->lockForUpdate()->firstOrFail();
             if (! in_array($upload->status, ['uploading', 'cancelled'], true)) {
                 throw new UploadConflict('Published assets require lifecycle operations and cannot be cancelled.');
             }
@@ -331,6 +331,13 @@ final readonly class MediaUploads
             fclose($stream);
             throw $exception;
         }
+    }
+
+    private function transferUpload(Authenticatable $actor, string $workspaceId, string $uploadId, ?string $purpose): Builder
+    {
+        $upload = $this->upload($workspaceId, $uploadId);
+
+        return $purpose === null ? $upload : $upload->where('purpose', $purpose)->where('actor_id', (string) $actor->getAuthIdentifier());
     }
 
     private function upload(string $workspaceId, string $uploadId): Builder
