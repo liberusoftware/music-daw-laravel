@@ -23,6 +23,7 @@
     "Versioned session documents",
     "Revision checkpoints",
     "Autosave recovery",
-    "Portable session manifests"
+    "Portable session manifests",
+    "Transactional revision audit integration"
   ]
 }

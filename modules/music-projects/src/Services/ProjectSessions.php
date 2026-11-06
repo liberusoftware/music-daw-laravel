@@ -15,6 +15,7 @@ use Liberu\Foundation\Files\Contracts\MediaAccess;
 use Liberu\Music\Projects\Commands\BackfillSessionRetention;
 use Liberu\Music\Projects\Commands\SaveSession;
 use Liberu\Music\Projects\Contracts\ProjectAccess;
+use Liberu\Music\Projects\Contracts\SessionAudit;
 use Liberu\Music\Projects\Contracts\SessionMediaRetention;
 use Liberu\Music\Projects\Contracts\VerifiedMedia;
 use Liberu\Music\Projects\Data\RetentionBackfillStatus;
@@ -37,9 +38,15 @@ final readonly class ProjectSessions
         private Dispatcher $events,
         private ?MediaAccess $mediaAccess = null,
         private ?SessionMediaRetention $retention = null,
+        private ?SessionAudit $audit = null,
     ) {}
 
     public function save(Authenticatable $actor, SaveSession $command): SessionRevision
+    {
+        return $this->persist($actor, $command, $command->autosave ? 'autosave' : 'checkpoint');
+    }
+
+    private function persist(Authenticatable $actor, SaveSession $command, string $operation, ?int $sourceVersion = null): SessionRevision
     {
         $this->access->authorize($actor, $command->workspaceId, $command->projectId, 'write');
         $this->verifyMedia($actor, $command->workspaceId, $command->document);
@@ -49,7 +56,7 @@ final readonly class ProjectSessions
             $command->autosave, $command->template,
         ], JSON_THROW_ON_ERROR));
 
-        return $this->database->transaction(function () use ($actor, $command, $fingerprint): SessionRevision {
+        return $this->database->transaction(function () use ($actor, $command, $fingerprint, $operation, $sourceVersion): SessionRevision {
             if ($command->expectedVersion === 0) {
                 // The unique project key arbitrates simultaneous creates. Lock the same
                 // row for all later writes, including autosaves and command replay.
@@ -96,6 +103,7 @@ final readonly class ProjectSessions
                 'created_at' => now('UTC'),
             ]);
             $revision = new SessionRevision($command->workspaceId, $command->projectId, $command->title, $version, $command->document, $command->autosave, $command->template);
+            $this->audit?->record($actor, $revision, $operation, $sourceVersion, $this->database);
             $this->events->dispatch(new SessionSaved($revision, (string) $actor->getAuthIdentifier()));
 
             return $revision;
@@ -171,7 +179,7 @@ final readonly class ProjectSessions
     {
         $source = $this->get($actor, $workspaceId, $projectId, $sourceVersion);
 
-        return $this->save($actor, new SaveSession($workspaceId, $projectId, $source->title, $source->document, $expectedVersion, $idempotencyKey, template: $source->template));
+        return $this->persist($actor, new SaveSession($workspaceId, $projectId, $source->title, $source->document, $expectedVersion, $idempotencyKey, template: $source->template), 'recovery', $sourceVersion);
     }
 
     public function retentionStatus(Authenticatable $actor, string $workspaceId): RetentionBackfillStatus
@@ -226,7 +234,7 @@ final readonly class ProjectSessions
     {
         $preview = $this->parseImport($actor, $workspaceId, $projectId, $manifest);
 
-        return $this->save($actor, new SaveSession($workspaceId, $projectId, $preview->title, $preview->document, 0, $idempotencyKey));
+        return $this->persist($actor, new SaveSession($workspaceId, $projectId, $preview->title, $preview->document, 0, $idempotencyKey), 'import');
     }
 
     public function previewImport(Authenticatable $actor, string $workspaceId, string $projectId, string $manifest): SessionImportPreview

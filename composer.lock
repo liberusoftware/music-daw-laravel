@@ -6888,7 +6888,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-projects",
-                "reference": "82f13fbadd9f5cd47771d5e45fe8a05ef756426c"
+                "reference": "fb7d295563e96d573c7ca2eee724ec4a3efc77a8"
             },
             "require": {
                 "illuminate/auth": "^13.38",
@@ -6932,7 +6932,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Actor-authorized Music session documents, revisions, transactional media retention and autosave recovery.",
+            "description": "Actor-authorized Music session documents, revisions, transactional retention and audit integration.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

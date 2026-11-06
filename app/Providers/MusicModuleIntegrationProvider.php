@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\AuditedSessionRevisions;
 use App\Support\MusicWorkspaceContext;
 use App\Support\UploadedSessionMedia;
 use App\Support\UploadedSessionRetention;
@@ -10,6 +11,7 @@ use Illuminate\Support\ServiceProvider;
 use Liberu\Foundation\Files\Contracts\MediaAccess;
 use Liberu\Music\MediaLibrary\MusicMediaLibraryServiceProvider;
 use Liberu\Music\MediaLibrary\Support\ScopedMediaAccess;
+use Liberu\Music\Projects\Contracts\SessionAudit;
 use Liberu\Music\Projects\Contracts\SessionMediaRetention;
 use Liberu\Music\Projects\Contracts\VerifiedMedia;
 use Liberu\Music\Projects\MusicProjectsServiceProvider;
@@ -21,6 +23,7 @@ final class MusicModuleIntegrationProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(WorkspaceContext::class, MusicWorkspaceContext::class);
+        $this->app->when(ProjectSessions::class)->needs(SessionAudit::class)->give(AuditedSessionRevisions::class);
     }
 
     public function boot(): void
