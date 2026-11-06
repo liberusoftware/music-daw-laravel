@@ -26,7 +26,7 @@ final readonly class StartUpload implements JsonSerializable
             'workspace' => ['required', 'string', 'max:128'], 'id' => ['required', 'uuid'],
             'name' => ['required', 'string', 'max:255'], 'bytes' => ['required', 'integer:strict', 'between:44,'.($purpose === 'archive' ? ArchiveInputLimit::bytes() : 1073741824)],
             'purpose' => ['required', 'in:audio,archive'],
-            'sha256' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/'],
+            'sha256' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/D'],
             'provenance' => ['array:source,license,attribution'],
             'provenance.*' => ['string', 'max:2048'],
         ])->validate();

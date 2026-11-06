@@ -512,6 +512,9 @@ describe('private resumable archive inputs', function () {
         config()->set('music-media.archive_max_audio_bytes', 17179869184);
         expect((new StartUpload('studio', (string) Str::uuid(), 'Maximum.zip', 17196646400, str_repeat('a', 64), purpose: 'archive'))->bytes)->toBe(17196646400);
         expect(fn () => new StartUpload('studio', (string) Str::uuid(), 'Oversized.zip', 17196646401, str_repeat('a', 64), purpose: 'archive'))->toThrow(ValidationException::class);
+        foreach (['audio', 'archive'] as $purpose) {
+            expect(fn () => new StartUpload('studio', (string) Str::uuid(), 'Invalid checksum', 44, str_repeat('a', 64)."\n", purpose: $purpose))->toThrow(ValidationException::class);
+        }
         config()->set('music-media.archive_max_audio_bytes', 0);
         expect(fn () => ($this->archiveCommand)())->toThrow(ValidationException::class);
         expect(fn () => new StartUpload('studio', (string) Str::uuid(), 'Invalid purpose', 44, str_repeat('a', 64), purpose: 'other'))->toThrow(ValidationException::class);
