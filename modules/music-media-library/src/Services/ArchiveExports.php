@@ -14,6 +14,7 @@ use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Liberu\Music\MediaLibrary\Commands\RequestArchiveExport;
 use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\Data\ArchiveExportTask;
@@ -49,12 +50,9 @@ final readonly class ArchiveExports
             if (in_array($row->status, ['ready', 'cancelled', 'expired'], true)) {
                 return $this->task($row);
             }
-            if ($row->status === 'failed') {
-                $this->change($row, 'queued');
-            } elseif ($inserted === 1) {
-                $this->events->dispatch(new ArchiveExportChanged($this->task($row)));
-            }
-            $this->database->afterCommit(fn () => $this->bus->dispatch(new ExportPackArchiveTask($row->id)));
+            $job = new ExportPackArchiveTask($row->id, (string) Str::uuid());
+            $this->change($row, 'queued', ['dispatch_id' => $job->dispatchId], $inserted === 1 || $row->status === 'failed');
+            $this->database->afterCommit(fn () => $this->bus->dispatch($job));
 
             return $this->task($row);
         }, 3);
@@ -106,11 +104,11 @@ final readonly class ArchiveExports
         }, 3);
     }
 
-    public function process(string $taskId): void
+    public function process(string $taskId, ?string $dispatchId = null): void
     {
-        $this->database->transaction(function () use ($taskId): void {
+        $this->database->transaction(function () use ($taskId, $dispatchId): void {
             $row = $this->database->table('music_media_archive_exports')->where('id', $taskId)->lockForUpdate()->firstOrFail();
-            if ($row->status !== 'queued') {
+            if ($row->status !== 'queued' || ($dispatchId !== null && $row->dispatch_id !== $dispatchId)) {
                 return;
             }
             $actor = $this->users?->retrieveById($row->actor_id);
@@ -134,11 +132,11 @@ final readonly class ArchiveExports
         }, 3);
     }
 
-    public function failed(string $taskId): void
+    public function failed(string $taskId, ?string $dispatchId = null): void
     {
-        $this->database->transaction(function () use ($taskId): void {
+        $this->database->transaction(function () use ($taskId, $dispatchId): void {
             $row = $this->database->table('music_media_archive_exports')->where('id', $taskId)->lockForUpdate()->first();
-            if ($row !== null && $row->status === 'queued') {
+            if ($row !== null && $row->status === 'queued' && ($dispatchId === null || $row->dispatch_id === $dispatchId)) {
                 $this->change($row, 'failed');
             }
         }, 3);
@@ -188,7 +186,7 @@ final readonly class ArchiveExports
             $transfer === null ? null : new ArchiveTransfer($transfer['workspace_id'], $transfer['pack_id'], $transfer['version'], $transfer['bytes'], $transfer['sha256'], $transfer['media_objects']), $row->expires_at);
     }
 
-    private function change(object $row, string $status, array $values = []): void
+    private function change(object $row, string $status, array $values = [], bool $emit = true): void
     {
         $values += ['status' => $status, 'updated_at' => now('UTC')];
         if ($this->database->table('music_media_archive_exports')->where('id', $row->id)->where('status', $row->status)->update($values) !== 1) {
@@ -197,7 +195,9 @@ final readonly class ArchiveExports
         foreach ($values as $field => $value) {
             $row->{$field} = $value;
         }
-        $this->events->dispatch(new ArchiveExportChanged($this->task($row)));
+        if ($emit) {
+            $this->events->dispatch(new ArchiveExportChanged($this->task($row)));
+        }
     }
 
     private function key(string $workspaceId, string $taskId): string

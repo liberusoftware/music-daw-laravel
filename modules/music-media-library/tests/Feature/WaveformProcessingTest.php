@@ -74,7 +74,7 @@ it('queues only after commit and returns authorized versioned task and cached re
     expect($task->status)->toBe('queued')->and($this->processing->result($this->actor, 'studio', $task->id))->toBeNull();
     DB::commit();
     Bus::assertDispatched(BuildWaveform::class, fn ($job) => $job->taskId === $task->id);
-    $job = unserialize(serialize(new BuildWaveform($task->id)));
+    $job = unserialize(serialize(Bus::dispatched(BuildWaveform::class)->last()));
     $job->handle($this->processing);
     expect($this->processing->get($this->actor, 'studio', $task->id)->status)->toBe('ready')
         ->and($this->processing->result($this->actor, 'studio', $task->id)->peaks)->toHaveCount(2)
@@ -101,7 +101,7 @@ it('replays queued and failed requests and recovers evicted previews without new
     $command = ($this->command)();
     $this->processing->request($this->actor, $command);
     $this->processing->request($this->actor, $command);
-    (new BuildWaveform($command->taskId))->failed(new RuntimeException('/private/audio'));
+    Bus::dispatched(BuildWaveform::class)->last()->failed(new RuntimeException('/private/audio'));
     expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('failed')
         ->and(json_encode($this->events[0]))->not->toContain('private');
     $this->processing->failed($command->taskId);
@@ -314,3 +314,81 @@ it('resolves the canonical provider independently of later Sanctum guard selecti
     app(WaveformProcessing::class)->process($command->taskId);
     expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('ready');
 })->with([['web', null], ['sanctum', null], ['sanctum', 'canonical']]);
+
+it('fences stale deliveries and failures when failed or evicted waveform tasks are requeued', function () {
+    $command = ($this->command)();
+    $this->processing->request($this->actor, $command);
+    $old = Bus::dispatched(BuildWaveform::class)->last();
+    $old->failed(new RuntimeException('Original exhausted'));
+    $this->processing->request($this->actor, $command);
+    $retry = Bus::dispatched(BuildWaveform::class)->last();
+    $old->failed(new RuntimeException('Delayed failure'));
+    $old->handle($this->processing);
+    expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued');
+    $retry->handle($this->processing);
+    app(Repository::class)->flush();
+    $this->processing->request($this->actor, $command);
+    $retry->failed(new RuntimeException('Prior ready generation'));
+    $retry->handle($this->processing);
+    expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued');
+    Bus::dispatched(BuildWaveform::class)->last()->handle($this->processing);
+    expect($this->processing->result($this->actor, 'studio', $command->taskId)->audio->sha256)->toBe(hash('sha256', $this->bytes));
+});
+
+it('checks generation and failed state again after an in-flight waveform build', function (string $mutation) {
+    $command = ($this->command)();
+    $this->processing->request($this->actor, $command);
+    $old = Bus::dispatched(BuildWaveform::class)->last();
+    $store = Mockery::mock(Repository::class);
+    $store->shouldReceive('remember')->once()->andReturnUsing(function ($key, $ttl, $build) use ($command, $old, $mutation) {
+        if ($mutation === 'replay') {
+            $this->processing->request($this->actor, $command);
+        } else {
+            $old->failed(new RuntimeException('Delivery exhausted during build'));
+        }
+
+        return $build();
+    });
+    $processing = new WaveformProcessing(DB::connection(), $this->uploads, new CachedWaveforms($this->uploads, app(AssetWaveforms::class), $store), $this->users, app(Dispatcher::class), app(Events::class), app(MediaAuthorizer::class));
+    $old->handle($processing);
+    expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe($mutation === 'replay' ? 'queued' : 'failed');
+    expect($this->processing->result($this->actor, 'studio', $command->taskId))->toBeNull();
+    if ($mutation === 'failure') {
+        $this->processing->request($this->actor, $command);
+    }
+    Bus::dispatched(BuildWaveform::class)->last()->handle($this->processing);
+    expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('ready');
+})->with(['replay', 'failure']);
+
+it('refuses suppressed waveform state acknowledgements without emitting false progress', function (string $target) {
+    $command = ($this->command)();
+    $this->processing->request($this->actor, $command);
+    $job = Bus::dispatched(BuildWaveform::class)->last();
+    DB::unprepared("CREATE TRIGGER ignore_waveform_transition BEFORE UPDATE ON music_media_waveform_tasks WHEN NEW.status = '$target' BEGIN SELECT RAISE(IGNORE); END");
+    try {
+        if ($target === 'queued') {
+            expect(fn () => $this->processing->request($this->actor, $command))->toThrow(UploadConflict::class, 'dispatch identity');
+        } elseif ($target === 'ready') {
+            expect(fn () => $job->handle($this->processing))->toThrow(UploadConflict::class, 'publication');
+        } else {
+            expect(fn () => $job->failed(new RuntimeException('Exhausted')))->toThrow(UploadConflict::class, 'failure');
+        }
+        expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued')->and($this->events)->toHaveCount(1);
+    } finally {
+        DB::unprepared('DROP TRIGGER ignore_waveform_transition');
+    }
+    $job->handle($this->processing);
+    expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('ready');
+})->with(['queued', 'ready', 'failed']);
+
+it('ignores legacy waveform payloads without borrowing the current dispatch identity', function () {
+    $command = ($this->command)();
+    $this->processing->request($this->actor, $command);
+    $class = BuildWaveform::class;
+    $legacy = unserialize(sprintf('O:%d:"%s":1:{s:6:"taskId";s:36:"%s";}', strlen($class), $class, $command->taskId));
+    $legacy->handle($this->processing);
+    $legacy->failed(new RuntimeException('Legacy callback'));
+    expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued');
+    Bus::dispatched(BuildWaveform::class)->last()->handle($this->processing);
+    expect($this->processing->get($this->actor, 'studio', $command->taskId)->status)->toBe('ready');
+});

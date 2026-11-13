@@ -76,7 +76,7 @@ it('queues after commit and exports a private verified version-pinned ZIP once',
     $this->jobs->request($this->actor, $command);
     expect($this->events)->toHaveCount(1)->and($this->jobs->result($this->actor, 'studio', $command->taskId))->toBeNull();
     expect(fn () => $this->jobs->open($this->actor, 'studio', $command->taskId))->toThrow(UploadConflict::class);
-    (new ExportPackArchiveTask($command->taskId))->handle($this->jobs);
+    Bus::dispatched(ExportPackArchiveTask::class)->last()->handle($this->jobs);
     $this->jobs->process($command->taskId);
     $result = $this->jobs->result($this->actor, 'studio', $command->taskId);
     $stream = $this->jobs->open($this->actor, 'studio', $command->taskId);
@@ -125,7 +125,7 @@ it('rolls back failed acknowledgements then retries without publishing unverifie
     DB::unprepared("CREATE TRIGGER ignore_archive_ack BEFORE UPDATE OF status ON music_media_archive_exports WHEN NEW.status = 'ready' BEGIN SELECT RAISE(IGNORE); END");
     expect(fn () => $this->jobs->process($command->taskId))->toThrow(LogicException::class);
     expect($this->jobs->result($this->actor, 'studio', $command->taskId))->toBeNull();
-    (new ExportPackArchiveTask($command->taskId))->failed(new RuntimeException('/private/path secret'));
+    Bus::dispatched(ExportPackArchiveTask::class)->last()->failed(new RuntimeException('/private/path secret'));
     expect($this->jobs->get($this->actor, 'studio', $command->taskId)->jsonSerialize()['error_code'])->toBe('archive_export_failed');
     expect(fn () => $this->jobs->cancel($this->actor, 'studio', $command->taskId))->toThrow(UploadConflict::class);
     DB::unprepared('DROP TRIGGER ignore_archive_ack');
@@ -205,4 +205,60 @@ it('supports a real synchronous queue and safely rolls back only its task schema
     $migration->down();
     expect(Schema::hasTable('music_media_archive_exports'))->toBeFalse()->and(Schema::hasTable('music_media_packs'))->toBeTrue()
         ->and(app(MediaUploads::class)->get($this->actor, 'studio', $this->asset)->id)->toBe($this->asset);
+});
+
+it('fences delayed ZIP deliveries and failure callbacks after an explicit retry', function () {
+    $command = ($this->command)();
+    $this->jobs->request($this->actor, $command);
+    $old = Bus::dispatched(ExportPackArchiveTask::class)->last();
+    $this->jobs->request($this->actor, $command);
+    $queued = Bus::dispatched(ExportPackArchiveTask::class)->last();
+    $old->handle($this->jobs);
+    $old->failed(new RuntimeException('Outdated queued payload'));
+    expect($this->jobs->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued');
+    $queued->failed(new RuntimeException('Current delivery exhausted'));
+    $this->jobs->request($this->actor, $command);
+    $queued->failed(new RuntimeException('Delayed exhausted callback'));
+    $queued->handle($this->jobs);
+    expect($this->jobs->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued')
+        ->and($this->disk->exists(($this->key)($command->taskId)))->toBeFalse();
+    Bus::dispatched(ExportPackArchiveTask::class)->last()->handle($this->jobs);
+    $stream = $this->jobs->open($this->actor, 'studio', $command->taskId);
+    try {
+        expect(hash('sha256', stream_get_contents($stream)))->toBe($this->jobs->result($this->actor, 'studio', $command->taskId)->sha256);
+    } finally {
+        fclose($stream);
+    }
+});
+
+it('ignores pre-upgrade serialized archive payloads until a fenced request is dispatched', function () {
+    $command = ($this->command)();
+    $this->jobs->request($this->actor, $command);
+    $class = ExportPackArchiveTask::class;
+    $legacy = unserialize(sprintf('O:%d:"%s":1:{s:6:"taskId";s:36:"%s";}', strlen($class), $class, $command->taskId));
+    $legacy->handle($this->jobs);
+    $legacy->failed(new RuntimeException('Legacy failure'));
+    expect($this->jobs->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued')
+        ->and($this->disk->exists(($this->key)($command->taskId)))->toBeFalse();
+    Bus::dispatched(ExportPackArchiveTask::class)->last()->handle($this->jobs);
+    expect($this->jobs->get($this->actor, 'studio', $command->taskId)->status)->toBe('ready');
+});
+
+it('preserves legacy derived tasks and recordings across dispatch migration rollback and upgrade', function () {
+    $command = ($this->command)();
+    $this->jobs->request($this->actor, $command);
+    $old = Bus::dispatched(ExportPackArchiveTask::class)->last();
+    $migration = require __DIR__.'/../../database/migrations/2026_11_13_215104_add_dispatch_identity_to_music_media_derived_tasks.php';
+    $migration->down();
+    expect(Schema::hasColumn('music_media_waveform_tasks', 'dispatch_id'))->toBeFalse()
+        ->and(Schema::hasColumn('music_media_archive_exports', 'dispatch_id'))->toBeFalse()
+        ->and(DB::table('music_media_archive_exports')->where('id', $command->taskId)->value('status'))->toBe('queued')
+        ->and(app(MediaUploads::class)->get($this->actor, 'studio', $this->asset)->id)->toBe($this->asset);
+    $migration->up();
+    $old->handle($this->jobs);
+    $old->failed(new RuntimeException('Stale generation'));
+    expect($this->jobs->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued');
+    $this->jobs->request($this->actor, $command);
+    Bus::dispatched(ExportPackArchiveTask::class)->last()->handle($this->jobs);
+    expect($this->jobs->get($this->actor, 'studio', $command->taskId)->status)->toBe('ready');
 });

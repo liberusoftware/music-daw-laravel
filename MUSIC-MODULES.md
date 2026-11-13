@@ -64,7 +64,7 @@ Run `composer test:scanner` after installing `clamav` and the test-only `libfake
 
 ## Media worker deployment budgets
 
-Verification/restoration and trash-recovery jobs use persisted dispatch identities so late deliveries/failure callbacks cannot overwrite a requeued attempt. Drain old workers before deploying the dispatch-identity migration, migrate before starting new workers, and replay outstanding original requests for legacy queued tasks. Legacy task-ID-only queue payloads intentionally perform no work. The [Core deployment notes](modules/music-media-library/README.md#verification-and-trash-recovery-dispatch-fencing) describe migration rollback and the trusted synchronous service boundary. Waveform and archive-export dispatch fencing remain separate work.
+Verification/restoration, trash-recovery, waveform and archive-export jobs use persisted dispatch identities so late deliveries/failure callbacks cannot overwrite a requeued attempt. Waveform publication rechecks the current generation after building, including evicted-cache rebuilds. Drain old workers before deploying both dispatch-identity migrations, migrate before starting new workers, and replay outstanding original requests for legacy queued tasks. Legacy task-ID-only queue payloads intentionally perform no work. The [Core deployment notes](modules/music-media-library/README.md#verification-and-trash-recovery-dispatch-fencing) describe both migrations, rollback and the trusted synchronous service boundary.
 
 Horizon requires `QUEUE_CONNECTION=redis` and a supervised Horizon process. The example environment keeps the host's database queue default; installing Music does not enable asynchronous production workers. Never use the synchronous connection for production archive imports.
 

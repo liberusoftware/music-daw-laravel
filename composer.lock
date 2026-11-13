@@ -6836,7 +6836,7 @@
             "dist": {
                 "type": "path",
                 "url": "modules/music-media-library",
-                "reference": "57e5123b96c851ed00b6c0b210c3ba5fe6a92b21"
+                "reference": "c3c94ab9962cf4dc76c0fd467e5a99c6070ea392"
             },
             "require": {
                 "ext-zip": "*",
@@ -6887,7 +6887,7 @@
             "license": [
                 "MIT"
             ],
-            "description": "Verified Music audio, fenced verification/recovery jobs, private archive intake, rights packs and safe cleanup.",
+            "description": "Verified Music audio, dispatch-fenced media jobs, private archive intake, rights packs and safe cleanup.",
             "transport-options": {
                 "symlink": true,
                 "relative": true
