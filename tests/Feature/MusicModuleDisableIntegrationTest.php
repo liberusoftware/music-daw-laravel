@@ -91,7 +91,7 @@ echo json_encode(['projects' => $app->getProvider(Liberu\Music\Projects\MusicPro
     'workspace_route' => Illuminate\Support\Facades\Route::has('music.projects.livewire.workspace')], JSON_THROW_ON_ERROR);
 CODE, $disabled);
         expect($state)->toBe(['projects' => false, 'media' => false, 'workspace_route' => false])->and($snapshot())->toBe($before);
-        foreach (['music:media:collect-quarantine', 'music:media:cleanup-archives'] as $command) {
+        foreach (['music:media:collect-quarantine', 'music:media:cleanup-archives', 'music:media:collect-trash'] as $command) {
             $collection = new Process([PHP_BINARY, 'artisan', $command, $saved['workspace_id'], (string) $saved['actor_id'], '--execute', '--no-interaction'], base_path(), array_replace($environment, $disabled));
             $collection->setTimeout(60)->run();
             expect($collection->getExitCode())->toBe(1)
