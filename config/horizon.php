@@ -207,7 +207,9 @@ return [
             'maxJobs' => 0,
             'memory' => 128,
             'tries' => 1,
-            'timeout' => 60,
+            // Allow job-level timeouts to report failure before Horizon kills
+            // the worker. Keep this below the connection's retry_after.
+            'timeout' => (int) env('HORIZON_WORKER_TIMEOUT', 75),
             'nice' => 0,
         ],
     ],

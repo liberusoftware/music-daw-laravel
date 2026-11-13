@@ -91,6 +91,11 @@ echo json_encode(['projects' => $app->getProvider(Liberu\Music\Projects\MusicPro
     'workspace_route' => Illuminate\Support\Facades\Route::has('music.projects.livewire.workspace')], JSON_THROW_ON_ERROR);
 CODE, $disabled);
         expect($state)->toBe(['projects' => false, 'media' => false, 'workspace_route' => false])->and($snapshot())->toBe($before);
+        $collection = new Process([PHP_BINARY, 'artisan', 'music:media:collect-quarantine', $saved['workspace_id'], (string) $saved['actor_id'], '--execute', '--no-interaction'], base_path(), array_replace($environment, $disabled));
+        $collection->setTimeout(60)->run();
+        expect($collection->getExitCode())->toBe(1)
+            ->and($collection->getOutput())->toContain('Music Media Library must be enabled')
+            ->and($snapshot())->toBe($before);
         $invalid = new Process([PHP_BINARY, '-r', $bootstrap], base_path(), array_replace($environment, ['MODULES_DISABLED' => 'music-projects']));
         $invalid->setTimeout(60)->run();
         expect($invalid->isSuccessful())->toBeFalse()->and($invalid->getErrorOutput().$invalid->getOutput())->toContain('requires enabled package')
