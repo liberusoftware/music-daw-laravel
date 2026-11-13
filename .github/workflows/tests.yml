@@ -13,8 +13,8 @@ jobs:
   host:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           extensions: bcmath, gd, intl, mbstring, pdo_sqlite, zip
@@ -25,7 +25,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends clamav libfaketime
       - run: composer test:coverage -- --coverage-clover=coverage/host.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: host-coverage
@@ -36,8 +36,8 @@ jobs:
       run:
         working-directory: modules/module-manager
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           extensions: intl, mbstring, pdo_sqlite
@@ -45,7 +45,7 @@ jobs:
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: vendor/bin/phpstan analyse src --level=5 --no-progress
       - run: composer test:coverage -- --coverage-clover=coverage/module-manager.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: module-manager-coverage
@@ -56,8 +56,8 @@ jobs:
       run:
         working-directory: modules/music-audio-engine
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           extensions: intl, mbstring, pdo_sqlite
@@ -65,7 +65,7 @@ jobs:
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: vendor/bin/phpstan analyse src --level=5 --no-progress --memory-limit=512M
       - run: composer test:coverage -- --coverage-clover=coverage/audio-engine.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: audio-engine-coverage
@@ -76,15 +76,15 @@ jobs:
       run:
         working-directory: modules/music-projects
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           extensions: intl, mbstring, pdo_sqlite
           coverage: pcov
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: composer test:coverage -- --coverage-clover=coverage/projects.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: projects-coverage
@@ -95,15 +95,15 @@ jobs:
       run:
         working-directory: modules/music-media-library
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           extensions: intl, mbstring, pdo_sqlite, zip
           coverage: pcov
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: composer test:coverage -- --coverage-clover=coverage/media.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: media-coverage
@@ -115,20 +115,20 @@ jobs:
       run:
         working-directory: modules/music-projects-api
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           extensions: intl, mbstring, pdo_sqlite
           coverage: pcov
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       - run: npx --yes @redocly/cli@2.15.0 lint openapi/projects.json
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: vendor/bin/phpstan analyse src --level=5 --no-progress --memory-limit=512M
       - run: composer test:coverage -- --coverage-clover=coverage/api.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: projects-api-coverage
@@ -140,20 +140,20 @@ jobs:
       run:
         working-directory: modules/music-media-library-api
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           extensions: intl, mbstring, pdo_sqlite, zip
           coverage: pcov
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       - run: npx --yes @redocly/cli@2.15.0 lint openapi/media.json
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: vendor/bin/phpstan analyse src --level=5 --no-progress --memory-limit=512M
       - run: composer test:coverage -- --coverage-clover=coverage/api.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: media-api-coverage
@@ -165,8 +165,8 @@ jobs:
       run:
         working-directory: modules/music-projects-livewire
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           extensions: intl, mbstring, pdo_sqlite
@@ -174,7 +174,7 @@ jobs:
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: vendor/bin/phpstan analyse src --level=5 --no-progress --memory-limit=512M
       - run: composer test:coverage -- --coverage-clover=coverage/livewire.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: projects-livewire-coverage
@@ -186,8 +186,8 @@ jobs:
       run:
         working-directory: modules/music-projects-filament
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           extensions: intl, mbstring, pdo_sqlite
@@ -195,7 +195,7 @@ jobs:
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: vendor/bin/phpstan analyse src --level=5 --no-progress --memory-limit=512M
       - run: composer test:coverage -- --coverage-clover=coverage/filament.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: projects-livewire-coverage
@@ -231,13 +231,13 @@ jobs:
       MUSIC_BROWSER_OUTPUT: ${{ github.workspace }}/music-browser-artifacts
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/music-browser-binaries
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           extensions: bcmath, gd, intl, mbstring, pdo_sqlite, zip
           coverage: none
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       - run: touch "$DB_DATABASE"
@@ -269,7 +269,7 @@ jobs:
         run: php artisan serve --host=127.0.0.1 --port=8743 --no-reload > "$RUNNER_TEMP/music-browser-server.log" 2>&1 &
       - run: curl --retry 30 --retry-connrefused --retry-delay 1 --silent --fail "$MUSIC_BROWSER_URL/login" > /dev/null
       - run: npm --prefix modules/music-projects-livewire run test:browser
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: projects-workspace-browser-${{ matrix.surface }}
