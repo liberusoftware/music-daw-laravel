@@ -38,7 +38,7 @@ function modulePhpFiles(string $module): array
     return array_values(array_filter(iterator_to_array($iterator), fn (SplFileInfo $file) => $file->isFile() && $file->getExtension() === 'php'));
 }
 
-it('lets every package install standalone', function () {
+it('allows Pest plugins for packages that use Pest test dependencies', function () {
     $root = dirname(__DIR__, 2);
     $packageFiles = array_merge(glob($root.'/modules/*/composer.json') ?: [], glob($root.'/themes/*/composer.json') ?: []);
 
@@ -46,6 +46,12 @@ it('lets every package install standalone', function () {
 
     foreach ($packageFiles as $packageFile) {
         $package = json_decode(file_get_contents($packageFile), true, flags: JSON_THROW_ON_ERROR);
+        $requirements = array_merge($package['require'] ?? [], $package['require-dev'] ?? []);
+        $testbench = packageVendor($package).'/package-testbench';
+
+        if (! isset($requirements['pestphp/pest']) && ! isset($requirements[$testbench])) {
+            continue;
+        }
 
         if (($package['config']['allow-plugins']['pestphp/pest-plugin'] ?? null) !== true) {
             throw new RuntimeException("{$package['name']} must allow pestphp/pest-plugin, or its standalone composer update aborts before installing Pest.");
