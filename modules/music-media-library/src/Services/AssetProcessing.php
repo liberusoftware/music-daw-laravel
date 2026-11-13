@@ -11,6 +11,7 @@ use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Contracts\Events\Dispatcher as Events;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Liberu\Music\MediaLibrary\Commands\ProcessAsset;
 use Liberu\Music\MediaLibrary\Commands\RestoreAsset;
@@ -52,12 +53,9 @@ final readonly class AssetProcessing
             if ($upload->receivedBytes !== $upload->totalBytes) {
                 throw ValidationException::withMessages(['upload' => 'Receive every declared byte before requesting verification.']);
             }
-            if ($row->status === 'failed') {
-                $this->change($row, 'queued');
-            } elseif ($inserted === 1) {
-                $this->events->dispatch(new AssetTaskChanged($this->task($row)));
-            }
-            $this->database->afterCommit(fn () => $this->bus->dispatch(new ProcessAssetTask($row->id)));
+            $job = new ProcessAssetTask($row->id, (string) Str::uuid());
+            $this->change($row, 'queued', ['dispatch_id' => $job->dispatchId], $inserted === 1 || $row->status === 'failed');
+            $this->database->afterCommit(fn () => $this->bus->dispatch($job));
 
             return $this->task($row);
         }, 3);
@@ -96,11 +94,11 @@ final readonly class AssetProcessing
     }
 
     /** The task lock serializes publication with cancellation: only one can win. */
-    public function process(string $taskId): void
+    public function process(string $taskId, ?string $dispatchId = null): void
     {
-        $this->database->transaction(function () use ($taskId): void {
+        $this->database->transaction(function () use ($taskId, $dispatchId): void {
             $row = $this->database->table('music_media_asset_tasks')->where('id', $taskId)->lockForUpdate()->firstOrFail();
-            if ($row->status !== 'queued') {
+            if ($row->status !== 'queued' || ($dispatchId !== null && $row->dispatch_id !== $dispatchId)) {
                 return;
             }
             $actor = $this->users?->retrieveById($row->actor_id);
@@ -117,11 +115,11 @@ final readonly class AssetProcessing
         }, 3);
     }
 
-    public function failed(string $taskId): void
+    public function failed(string $taskId, ?string $dispatchId = null): void
     {
-        $this->database->transaction(function () use ($taskId): void {
+        $this->database->transaction(function () use ($taskId, $dispatchId): void {
             $row = $this->database->table('music_media_asset_tasks')->where('id', $taskId)->lockForUpdate()->first();
-            if ($row !== null && $row->status === 'queued') {
+            if ($row !== null && $row->status === 'queued' && ($dispatchId === null || $row->dispatch_id === $dispatchId)) {
                 $this->change($row, 'failed');
             }
         }, 3);
@@ -153,13 +151,18 @@ final readonly class AssetProcessing
         return new AssetTask($row->id, $row->workspace_id, $row->upload_id, $row->restored_asset_id, $row->status);
     }
 
-    private function change(object $row, string $status): void
+    private function change(object $row, string $status, array $values = [], bool $emit = true): void
     {
-        $updated = $this->database->table('music_media_asset_tasks')->where('id', $row->id)->where('status', $row->status)->update(['status' => $status, 'updated_at' => now('UTC')]);
+        $values += ['status' => $status, 'updated_at' => now('UTC')];
+        $updated = $this->database->table('music_media_asset_tasks')->where('id', $row->id)->where('status', $row->status)->update($values);
         if ($updated !== 1) {
             throw new LogicException('The asset task state transition was not acknowledged.');
         }
-        $row->status = $status;
-        $this->events->dispatch(new AssetTaskChanged($this->task($row)));
+        foreach ($values as $field => $value) {
+            $row->{$field} = $value;
+        }
+        if ($emit) {
+            $this->events->dispatch(new AssetTaskChanged($this->task($row)));
+        }
     }
 }

@@ -1,6 +1,6 @@
 {
   "name": "liberusoftware/music-media-library",
-  "description": "Verified Music audio, private archive intake, queued imports/exports, rights packs and safe cleanup.",
+  "description": "Verified Music audio, fenced verification/recovery jobs, private archive intake, rights packs and safe cleanup.",
   "type": "liberu-module",
   "license": "MIT",
   "version": "0.1.0",

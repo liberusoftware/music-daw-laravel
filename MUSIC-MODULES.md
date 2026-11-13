@@ -64,6 +64,8 @@ Run `composer test:scanner` after installing `clamav` and the test-only `libfake
 
 ## Media worker deployment budgets
 
+Verification/restoration and trash-recovery jobs use persisted dispatch identities so late deliveries/failure callbacks cannot overwrite a requeued attempt. Drain old workers before deploying the dispatch-identity migration, migrate before starting new workers, and replay outstanding original requests for legacy queued tasks. Legacy task-ID-only queue payloads intentionally perform no work. The [Core deployment notes](modules/music-media-library/README.md#verification-and-trash-recovery-dispatch-fencing) describe migration rollback and the trusted synchronous service boundary. Waveform and archive-export dispatch fencing remain separate work.
+
 Horizon requires `QUEUE_CONNECTION=redis` and a supervised Horizon process. The example environment keeps the host's database queue default; installing Music does not enable asynchronous production workers. Never use the synchronous connection for production archive imports.
 
 Keep the job timeout strictly below `HORIZON_WORKER_TIMEOUT`, and keep that supervisor timeout strictly below `REDIS_QUEUE_RETRY_AFTER`. Archive imports also require retry_after strictly above their configured timeout plus the 15-second lease grace. Defaults are 60-second jobs, a 75-second Horizon supervisor and a 90-second Redis retry interval. For a 300-second import budget, use `MUSIC_MEDIA_ARCHIVE_IMPORT_TIMEOUT_SECONDS=300`, `HORIZON_WORKER_TIMEOUT=315` and `REDIS_QUEUE_RETRY_AFTER=330`. Apply these values consistently to every worker deployment and queue producer; environment-specific Horizon overrides must preserve the same ordering. Other queue connections need their own retry/visibility settings.
