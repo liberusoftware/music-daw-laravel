@@ -158,5 +158,10 @@
         }
     },
     "minimum-stability": "dev",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "homepage": "https://github.com/liberusoftware/project-music-daw-laravel-filament",
+    "support": {
+        "issues": "https://github.com/liberusoftware/project-music-daw-laravel-filament/issues",
+        "source": "https://github.com/liberusoftware/project-music-daw-laravel-filament"
+    }
 }
