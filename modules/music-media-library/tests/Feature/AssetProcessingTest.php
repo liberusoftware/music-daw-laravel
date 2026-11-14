@@ -9,6 +9,7 @@ use Illuminate\Contracts\Events\Dispatcher as Events;
 use Illuminate\Database\RecordNotFoundException;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -75,7 +76,7 @@ it('queues only after commit and publishes verified bytes atomically with the ta
     Bus::assertNothingDispatched();
     DB::commit();
     Bus::assertDispatched(ProcessAssetTask::class, fn ($job) => $job->taskId === $task->id);
-    $job = unserialize(serialize(new ProcessAssetTask($task->id)));
+    $job = unserialize(serialize(Bus::dispatched(ProcessAssetTask::class)->last()));
     $job->handle($this->jobs);
     expect($this->jobs->result($this->actor, 'studio', $task->id)->reference()['sha256'])->toBe(hash('sha256', $this->bytes))
         ->and($this->events)->toHaveCount(2)->and($job->tries)->toBe(3)->and($job->timeout)->toBe(60)->and($job->backoff)->toBe([5, 30, 120]);
@@ -142,7 +143,7 @@ it('retries scanner failures without exposing raw errors and refuses cancellatio
     $this->jobs->request($this->actor, $command);
     $this->scanClean = false;
     expect(fn () => $this->jobs->process($command->taskId))->toThrow(InvalidAudio::class);
-    (new ProcessAssetTask($command->taskId))->failed(new RuntimeException('/private/path'));
+    Bus::dispatched(ProcessAssetTask::class)->last()->failed(new RuntimeException('/private/path'));
     $failed = $this->jobs->get($this->actor, 'studio', $command->taskId);
     expect($failed->status)->toBe('failed')->and(json_encode($failed))->not->toContain('private')->and($failed->jsonSerialize()['error_code'])->toBe('asset_processing_failed');
     $this->jobs->process($command->taskId);
@@ -216,4 +217,57 @@ it('executes on the real sync queue and keeps schema rollback non-destructive', 
 it('validates task commands and prevents using the restoration target as its source', function () {
     expect(fn () => new ProcessAsset('', 'bad', 'bad'))->toThrow(ValidationException::class)
         ->and(fn () => ($this->command)($this->id, $this->id))->toThrow(ValidationException::class);
+});
+
+it('fences both delayed deliveries and failure callbacks across queued and failed replays', function () {
+    $command = ($this->command)();
+    $this->jobs->request($this->actor, $command);
+    $old = Bus::dispatched(ProcessAssetTask::class)->last();
+    $this->jobs->request($this->actor, $command);
+    $retry = Bus::dispatched(ProcessAssetTask::class)->last();
+    expect($retry->dispatchId)->not->toBe($old->dispatchId);
+    $old->handle($this->jobs);
+    $old->failed(new RuntimeException('Stale queued delivery'));
+    expect($this->jobs->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued');
+    $retry->failed(new RuntimeException('Current delivery exhausted'));
+    expect($this->jobs->get($this->actor, 'studio', $command->taskId)->status)->toBe('failed');
+    $this->jobs->request($this->actor, $command);
+    $retry->failed(new RuntimeException('Delayed exhausted callback'));
+    $retry->handle($this->jobs);
+    expect($this->jobs->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued');
+    Bus::dispatched(ProcessAssetTask::class)->last()->handle($this->jobs);
+    expect($this->jobs->result($this->actor, 'studio', $command->taskId)->id)->toBe($this->id);
+});
+
+it('ignores pre-upgrade serialized jobs without granting them the current dispatch identity', function () {
+    $command = ($this->command)();
+    $this->jobs->request($this->actor, $command);
+    $class = ProcessAssetTask::class;
+    $legacy = unserialize(sprintf('O:%d:"%s":1:{s:6:"taskId";s:36:"%s";}', strlen($class), $class, $command->taskId));
+    $legacy->handle($this->jobs);
+    $legacy->failed(new RuntimeException('Legacy failure'));
+    expect($this->jobs->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued')
+        ->and($this->uploads->status($this->actor, 'studio', $this->id)->status)->toBe('uploading');
+    Bus::dispatched(ProcessAssetTask::class)->last()->handle($this->jobs);
+    expect($this->jobs->result($this->actor, 'studio', $command->taskId)->id)->toBe($this->id);
+});
+
+it('preserves legacy tasks and recordings across dispatch schema rollback and reenables them through request replay', function () {
+    $command = ($this->command)();
+    $this->jobs->request($this->actor, $command);
+    $old = Bus::dispatched(ProcessAssetTask::class)->last();
+    $migration = require __DIR__.'/../../database/migrations/2026_11_13_213405_add_dispatch_identity_to_music_media_asset_tasks.php';
+    $migration->down();
+    expect(Schema::hasColumn('music_media_asset_tasks', 'dispatch_id'))->toBeFalse()
+        ->and(Schema::hasColumn('music_media_trash_recovery_tasks', 'dispatch_id'))->toBeFalse()
+        ->and(DB::table('music_media_asset_tasks')->where('id', $command->taskId)->value('status'))->toBe('queued')
+        ->and($this->uploads->status($this->actor, 'studio', $this->id)->receivedBytes)->toBe(strlen($this->bytes));
+    $migration->up();
+    expect(DB::table('music_media_asset_tasks')->where('id', $command->taskId)->value('dispatch_id'))->toBeNull();
+    $old->handle($this->jobs);
+    $old->failed(new RuntimeException('Stale generation after migration'));
+    expect($this->jobs->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued');
+    $this->jobs->request($this->actor, $command);
+    Bus::dispatched(ProcessAssetTask::class)->last()->handle($this->jobs);
+    expect($this->jobs->result($this->actor, 'studio', $command->taskId)->id)->toBe($this->id);
 });

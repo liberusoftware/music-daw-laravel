@@ -41,6 +41,7 @@ beforeEach(function () {
     Bus::fake();
     $this->processing = app(WaveformProcessing::class);
     $this->command = new RequestWaveform('studio', (string) Str::uuid(), $this->assetId, 1);
+    $this->jobFor = fn (string $id) => new BuildWaveform($id, DB::table('music_media_waveform_tasks')->where('id', $id)->value('dispatch_id'));
 });
 
 it('resolves the real host requester in serialized jobs and returns explicit progress and frame units', function () {
@@ -48,7 +49,7 @@ it('resolves the real host requester in serialized jobs and returns explicit pro
     expect($task->jsonSerialize())->toMatchArray(['status' => 'queued', 'terminal' => false, 'cancellable' => true,
         'progress' => ['completed_steps' => 0, 'total_steps' => 1, 'unit' => 'waveform_build']])
         ->and($this->processing->result($this->actor, 'studio', $task->id))->toBeNull();
-    $job = unserialize(serialize(new BuildWaveform($task->id)));
+    $job = unserialize(serialize(($this->jobFor)($task->id)));
     $job->handle($this->processing);
     $ready = $this->processing->get($this->actor, 'studio', $task->id);
     expect($ready->jsonSerialize())->toMatchArray(['status' => 'ready', 'terminal' => true, 'cancellable' => false,
@@ -64,15 +65,17 @@ it('resolves the real host requester in serialized jobs and returns explicit pro
 
 it('retries exhausted jobs and rebuilds evicted caches without changing task identity', function () {
     $task = $this->processing->request($this->actor, $this->command);
-    $job = new BuildWaveform($task->id);
+    $job = ($this->jobFor)($task->id);
     $job->failed(new RuntimeException('Worker unavailable'));
     expect($this->processing->get($this->actor, 'studio', $task->id)->status)->toBe('failed');
     expect(fn () => $this->processing->cancel($this->actor, 'studio', $task->id))->toThrow(UploadConflict::class);
     expect($this->processing->request($this->actor, $this->command)->status)->toBe('queued');
+    $job = ($this->jobFor)($task->id);
     $job->handle($this->processing);
     app(Repository::class)->flush();
     expect($this->processing->result($this->actor, 'studio', $task->id))->toBeNull()
         ->and($this->processing->request($this->actor, $this->command)->id)->toBe($task->id);
+    $job = ($this->jobFor)($task->id);
     $job->handle($this->processing);
     expect($this->processing->result($this->actor, 'studio', $task->id))->not->toBeNull()
         ->and(DB::table('music_media_waveform_tasks')->count())->toBe(1);
@@ -84,7 +87,7 @@ it('keeps cancellation terminal across request replay and late job delivery', fu
     expect($cancelled->jsonSerialize())->toMatchArray(['status' => 'cancelled', 'terminal' => true, 'cancellable' => false]);
     expect($this->processing->cancel($this->actor, 'studio', $task->id))->toEqual($cancelled)
         ->and($this->processing->request($this->actor, $this->command))->toEqual($cancelled);
-    $job = new BuildWaveform($task->id);
+    $job = ($this->jobFor)($task->id);
     $job->handle($this->processing);
     $job->failed(new RuntimeException('Late failure'));
     expect($this->processing->get($this->actor, 'studio', $task->id))->toEqual($cancelled)
@@ -99,7 +102,7 @@ it('isolates task ownership and workspace and enforces revoked permissions in wo
     Gate::define('music.media.read', fn () => false);
     expect(fn () => $this->processing->get($this->actor, 'studio', $task->id))->toThrow(AuthorizationException::class)
         ->and(fn () => $this->processing->cancel($this->actor, 'studio', $task->id))->toThrow(AuthorizationException::class)
-        ->and(fn () => (new BuildWaveform($task->id))->handle($this->processing))->toThrow(AuthorizationException::class);
+        ->and(fn () => ($this->jobFor)($task->id)->handle($this->processing))->toThrow(AuthorizationException::class);
 });
 
 it('refuses to impersonate a deleted requester and keeps missing-source status cancellable', function () {
@@ -107,7 +110,7 @@ it('refuses to impersonate a deleted requester and keeps missing-source status c
     $this->disk->delete(DB::table('music_media_uploads')->where('id', $this->assetId)->value('blob_key'));
     expect($this->processing->get($this->actor, 'studio', $task->id)->status)->toBe('queued');
     $this->actor->delete();
-    expect(fn () => (new BuildWaveform($task->id))->handle($this->processing))->toThrow(AuthorizationException::class, 'requester is unavailable');
+    expect(fn () => ($this->jobFor)($task->id)->handle($this->processing))->toThrow(AuthorizationException::class, 'requester is unavailable');
     expect($this->processing->cancel($this->actor, 'studio', $task->id)->status)->toBe('cancelled');
 });
 
@@ -123,7 +126,7 @@ it('rejects changed task parameters and preserves a queued task when cancellatio
 it('refuses a corrupted task source fingerprint without publishing a ready result', function () {
     $task = $this->processing->request($this->actor, $this->command);
     DB::table('music_media_waveform_tasks')->where('id', $task->id)->update(['source_sha256' => str_repeat('0', 64)]);
-    expect(fn () => (new BuildWaveform($task->id))->handle($this->processing))->toThrow(UploadConflict::class, 'source changed');
+    expect(fn () => ($this->jobFor)($task->id)->handle($this->processing))->toThrow(UploadConflict::class, 'source changed');
     expect($this->processing->get($this->actor, 'studio', $task->id)->status)->toBe('queued')
         ->and($this->processing->result($this->actor, 'studio', $task->id))->toBeNull();
 });

@@ -11,6 +11,7 @@ use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Contracts\Events\Dispatcher as Events;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Str;
 use Liberu\Music\MediaLibrary\Commands\RequestWaveform;
 use Liberu\Music\MediaLibrary\Contracts\MediaAuthorizer;
 use Liberu\Music\MediaLibrary\Data\Waveform;
@@ -42,14 +43,18 @@ final readonly class WaveformProcessing
             }
             if ($row->status !== 'ready' || $this->waveforms->get($actor, $command->workspaceId, $command->assetId, $command->framesPerPeak) === null) {
                 $changed = $inserted === 1 || $row->status !== 'queued';
-                $this->database->table('music_media_waveform_tasks')->where('id', $row->id)->update(['status' => 'queued', 'updated_at' => now()]);
+                $job = new BuildWaveform($row->id, (string) Str::uuid());
+                $updated = $this->database->table('music_media_waveform_tasks')->where('id', $row->id)->update(['status' => 'queued', 'dispatch_id' => $job->dispatchId, 'updated_at' => now()]);
+                if ($updated !== 1) {
+                    throw new UploadConflict('The waveform dispatch identity was not acknowledged.');
+                }
                 $row->status = 'queued';
                 if ($changed) {
                     $this->events->dispatch(new WaveformTaskChanged($this->task($row)));
                 }
                 // A queue outage leaves a durable queued request. Replaying this
                 // command re-dispatches it without creating another task identity.
-                $this->database->afterCommit(fn () => $this->bus->dispatch(new BuildWaveform($row->id)));
+                $this->database->afterCommit(fn () => $this->bus->dispatch($job));
             }
 
             return $this->task($row);
@@ -95,10 +100,10 @@ final readonly class WaveformProcessing
     }
 
     /** Queue worker boundary: resolves the canonical user and rechecks live asset permission. */
-    public function process(string $taskId): void
+    public function process(string $taskId, ?string $dispatchId = null): void
     {
         $row = $this->database->table('music_media_waveform_tasks')->where('id', $taskId)->firstOrFail();
-        if ($row->status === 'cancelled') {
+        if ($row->status === 'cancelled' || ($dispatchId !== null && ($row->status !== 'queued' || $row->dispatch_id !== $dispatchId))) {
             return;
         }
         $actor = $this->users?->retrieveById($row->actor_id);
@@ -109,22 +114,31 @@ final readonly class WaveformProcessing
         if (! hash_equals($row->source_sha256, $waveform->audio->sha256)) {
             throw new UploadConflict('The waveform task source changed.');
         }
-        $this->database->transaction(function () use ($row): void {
-            $updated = $this->database->table('music_media_waveform_tasks')->where('id', $row->id)->whereIn('status', ['queued', 'failed'])->update(['status' => 'ready', 'updated_at' => now()]);
-            if ($updated === 1) {
-                $row->status = 'ready';
-                $this->events->dispatch(new WaveformTaskChanged($this->task($row)));
+        $this->database->transaction(function () use ($row, $dispatchId): void {
+            $current = $this->database->table('music_media_waveform_tasks')->where('id', $row->id)->lockForUpdate()->firstOrFail();
+            if (! in_array($current->status, ['queued', 'failed'], true)
+                || ($dispatchId !== null && ($current->status !== 'queued' || $current->dispatch_id !== $dispatchId))) {
+                return;
             }
+            $updated = $this->database->table('music_media_waveform_tasks')->where('id', $current->id)->where('status', $current->status)->update(['status' => 'ready', 'updated_at' => now()]);
+            if ($updated !== 1) {
+                throw new UploadConflict('The waveform publication was not acknowledged.');
+            }
+            $current->status = 'ready';
+            $this->events->dispatch(new WaveformTaskChanged($this->task($current)));
         }, 3);
     }
 
     /** Exhausted queue attempts only; do not expose exception messages or private paths. */
-    public function failed(string $taskId): void
+    public function failed(string $taskId, ?string $dispatchId = null): void
     {
-        $this->database->transaction(function () use ($taskId): void {
+        $this->database->transaction(function () use ($taskId, $dispatchId): void {
             $row = $this->database->table('music_media_waveform_tasks')->where('id', $taskId)->lockForUpdate()->first();
-            if ($row !== null && $row->status === 'queued') {
-                $this->database->table('music_media_waveform_tasks')->where('id', $taskId)->update(['status' => 'failed', 'updated_at' => now()]);
+            if ($row !== null && $row->status === 'queued' && ($dispatchId === null || $row->dispatch_id === $dispatchId)) {
+                $updated = $this->database->table('music_media_waveform_tasks')->where('id', $taskId)->update(['status' => 'failed', 'updated_at' => now()]);
+                if ($updated !== 1) {
+                    throw new UploadConflict('The waveform failure was not acknowledged.');
+                }
                 $row->status = 'failed';
                 $this->events->dispatch(new WaveformTaskChanged($this->task($row)));
             }

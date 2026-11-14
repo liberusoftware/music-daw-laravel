@@ -19,15 +19,20 @@ final class RecoverTrashTask implements ShouldQueueAfterCommit
 
     public array $backoff = [5, 30, 120];
 
-    public function __construct(public readonly string $taskId) {}
+    /** Legacy payloads have no dispatch identity and must be re-requested. */
+    public function __construct(public readonly string $taskId, public readonly ?string $dispatchId = null) {}
 
     public function handle(TrashRecovery $processing): void
     {
-        $processing->process($this->taskId);
+        if (isset($this->dispatchId)) {
+            $processing->process($this->taskId, $this->dispatchId);
+        }
     }
 
     public function failed(?Throwable $exception): void
     {
-        app(TrashRecovery::class)->failed($this->taskId);
+        if (isset($this->dispatchId)) {
+            app(TrashRecovery::class)->failed($this->taskId, $this->dispatchId);
+        }
     }
 }

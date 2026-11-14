@@ -2,7 +2,7 @@
   "$schema": "https://schemas.liberu.dev/module/v1.json",
   "name": "music-media-library",
   "display_name": "Music Media Library",
-  "description": "Verified Music audio, private archive intake, queued imports/exports, rights packs and safe cleanup.",
+  "description": "Verified Music audio, dispatch-fenced media jobs, private archive intake, rights packs and safe cleanup.",
   "version": "0.1.0",
   "category": "product",
   "provider": "Liberu\\Music\\MediaLibrary\\MusicMediaLibraryServiceProvider",
@@ -42,6 +42,7 @@
     "Durable actor-owned queued integrity-verified trash recovery",
     "Durable private pack ZIP export tasks, verified expiring results and bounded cleanup",
     "Purpose-bound private resumable archive intake with scanner, checksum and quota enforcement",
-    "Owned queued archive imports with durable audio progress, atomic pack acknowledgement and cancellation"
+    "Owned queued archive imports with durable audio progress, atomic pack acknowledgement and cancellation",
+    "Dispatch-fenced verification, missing-audio restoration, trash recovery, waveform rebuilding and ZIP export retries"
   ]
 }

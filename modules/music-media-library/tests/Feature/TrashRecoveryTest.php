@@ -79,7 +79,7 @@ it('queues after commit and recovers the original verified identity with safe pu
     expect($this->events)->toHaveCount(1)->and($this->jobs->result($this->actor, 'studio', $command->taskId))->toBeNull();
     $this->jobs->request($this->actor, $command);
     expect($this->events)->toHaveCount(1);
-    (new RecoverTrashTask($command->taskId))->handle($this->jobs);
+    Bus::dispatched(RecoverTrashTask::class)->last()->handle($this->jobs);
     $this->jobs->process($command->taskId);
     expect($this->jobs->get($this->actor, 'studio', $command->taskId)->jsonSerialize())->toMatchArray(['kind' => 'recover_trash', 'status' => 'ready', 'terminal' => true, 'cancellable' => false, 'error_code' => null])
         ->and($this->jobs->result($this->actor, 'studio', $command->taskId)->id)->toBe($this->id)
@@ -124,7 +124,7 @@ it('fails safely on corrupt media and retries the same recovery command without 
     $key = 'music/assets/'.hash('sha256', 'studio').'/'.hash('sha256', $this->bytes);
     $this->disk->put($key, 'corrupt');
     expect(fn () => $this->jobs->process($command->taskId))->toThrow(InvalidAudio::class);
-    (new RecoverTrashTask($command->taskId))->failed(new RuntimeException('/private/path secret'));
+    Bus::dispatched(RecoverTrashTask::class)->last()->failed(new RuntimeException('/private/path secret'));
     expect($this->jobs->get($this->actor, 'studio', $command->taskId)->jsonSerialize()['error_code'])->toBe('trash_recovery_failed');
     expect(fn () => $this->jobs->cancel($this->actor, 'studio', $command->taskId))->toThrow(UploadConflict::class);
     $this->disk->put($key, $this->bytes);
@@ -163,4 +163,37 @@ it('runs on a real synchronous queue and rolls back only its own task schema', f
     $migration->down();
     expect(Schema::hasTable('music_media_trash_recovery_tasks'))->toBeFalse()
         ->and(DB::table('music_media_uploads')->where('id', $this->id)->exists())->toBeTrue();
+});
+
+it('fences delayed deliveries and failure callbacks across queued and failed recovery replays', function () {
+    $command = ($this->command)();
+    $this->jobs->request($this->actor, $command);
+    $old = Bus::dispatched(RecoverTrashTask::class)->last();
+    $this->jobs->request($this->actor, $command);
+    $retry = Bus::dispatched(RecoverTrashTask::class)->last();
+    expect($retry->dispatchId)->not->toBe($old->dispatchId);
+    $old->handle($this->jobs);
+    $old->failed(new RuntimeException('Stale queued delivery'));
+    expect($this->jobs->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued');
+    $retry->failed(new RuntimeException('Current delivery exhausted'));
+    expect($this->jobs->get($this->actor, 'studio', $command->taskId)->status)->toBe('failed');
+    $this->jobs->request($this->actor, $command);
+    $retry->failed(new RuntimeException('Delayed exhausted callback'));
+    $retry->handle($this->jobs);
+    expect($this->jobs->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued');
+    Bus::dispatched(RecoverTrashTask::class)->last()->handle($this->jobs);
+    expect($this->jobs->result($this->actor, 'studio', $command->taskId)->id)->toBe($this->id);
+});
+
+it('ignores legacy recovery job payloads and requires a newly dispatched request', function () {
+    $command = ($this->command)();
+    $this->jobs->request($this->actor, $command);
+    $class = RecoverTrashTask::class;
+    $legacy = unserialize(sprintf('O:%d:"%s":1:{s:6:"taskId";s:36:"%s";}', strlen($class), $class, $command->taskId));
+    $legacy->handle($this->jobs);
+    $legacy->failed(new RuntimeException('Legacy failure'));
+    expect($this->jobs->get($this->actor, 'studio', $command->taskId)->status)->toBe('queued')
+        ->and(DB::table('music_media_uploads')->where('id', $this->id)->value('status'))->toBe('trashed');
+    Bus::dispatched(RecoverTrashTask::class)->last()->handle($this->jobs);
+    expect($this->jobs->result($this->actor, 'studio', $command->taskId)->id)->toBe($this->id);
 });
